@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import logo from "../../public/assets/sunocampus_logo.png";
+import logo from "../assets/sunocampus_logo.png";
 
 function Home() {
   return (
