@@ -1,14 +1,15 @@
-import logo from "../public/assets/sunocampus_logo.png";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Home from "./pages/Home";
+import About from "./pages/About";
 
 function App() {
   return (
-    <div className="h-screen w-screen bg-[#0B1F3B] flex items-center justify-center">
-      <img
-        src={logo}  
-        alt="Suno Campus Logo"
-        className="w-96 object-contain"
-      />
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/about" element={<About />} />
+      </Routes>
+    </Router>
   );
 }
 
