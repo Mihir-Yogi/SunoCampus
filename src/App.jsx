@@ -4,6 +4,7 @@ import Home from "./pages/Home";
 import About from "./pages/About";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Profile from "./pages/Profile";
 import { Navbar } from "./components/Navbar";
 
 function App() {
@@ -53,6 +54,10 @@ function App() {
         <Route 
           path="/register" 
           element={isAuthenticated ? <Navigate to="/about" /> : <Register />} 
+        />
+        <Route 
+          path="/profile" 
+          element={isAuthenticated ? <Profile onLogout={handleLogout} /> : <Navigate to="/login" />} 
         />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

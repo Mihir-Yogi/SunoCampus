@@ -37,12 +37,6 @@ export const Navbar = ({ isAuthenticated, onLogout }) => {
                 <Link to="/profile" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
                   👤 Profile
                 </Link>
-                <button
-                  onClick={handleLogout}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
-                >
-                  Logout
-                </button>
               </>
             ) : (
               <>
@@ -88,12 +82,6 @@ export const Navbar = ({ isAuthenticated, onLogout }) => {
                 <Link to="/profile" className="block py-2 text-gray-700 hover:text-blue-600 transition-colors">
                   👤 Profile
                 </Link>
-                <button
-                  onClick={handleLogout}
-                  className="w-full mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Logout
-                </button>
               </>
             ) : (
               <>

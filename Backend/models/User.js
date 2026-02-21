@@ -81,17 +81,32 @@ const userSchema = new mongoose.Schema({
   avatar: String,
   profilePicture: String,
   bio: String,
+  location: {
+    type: String,
+    trim: true,
+  },
+  degreeProgram: {
+    type: String,
+    trim: true,
+  },
+  academicInterests: {
+    type: String,
+    trim: true,
+    maxlength: 500,
+  },
+
+  // Contributor request
+  contributorStatus: {
+    type: String,
+    enum: ['none', 'pending', 'approved', 'rejected'],
+    default: 'none',
+  },
+  contributorRequestedAt: Date,
 
   // Timestamps
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
   lastLogin: Date,
+}, {
+  timestamps: true,
 });
 
 export default mongoose.model('User', userSchema);

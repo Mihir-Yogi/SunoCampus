@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import connectDB from './config/db.js';
 import authRoutes from './routes/auth.js';
+import profileRoutes from './routes/profile.js';
 
 console.log('\n🔧 Configuration Check:');
 console.log(`  NODE_ENV: ${process.env.NODE_ENV}`);
@@ -23,6 +24,7 @@ connectDB();
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Test Route
 app.get('/api/health', (req, res) => {
