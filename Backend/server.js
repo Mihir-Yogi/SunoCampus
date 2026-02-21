@@ -1,9 +1,13 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import connectDB from './config/db.js';
+import authRoutes from './routes/auth.js';
 
-dotenv.config();
+console.log('\n🔧 Configuration Check:');
+console.log(`  NODE_ENV: ${process.env.NODE_ENV}`);
+console.log(`  MONGODB_URI: ${process.env.MONGODB_URI ? '✓ Configured' : '✗ Missing'}`);
+console.log(`  EMAIL_USER: ${process.env.EMAIL_USER ? '✓ Configured' : '✗ Missing'}`);
+console.log(`  EMAIL_PASS: ${process.env.EMAIL_PASS ? '✓ Configured' : '✗ Missing'}\n`);
 
 const app = express();
 
@@ -16,6 +20,9 @@ app.use(cors({
 
 // Connect Database
 connectDB();
+
+// API Routes
+app.use('/api/auth', authRoutes);
 
 // Test Route
 app.get('/api/health', (req, res) => {
