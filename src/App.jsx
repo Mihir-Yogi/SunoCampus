@@ -5,27 +5,44 @@ import About from "./pages/About";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
+import AdminDashboard from "./pages/AdminDashboard";
 import { Navbar } from "./components/Navbar";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Check if user is logged in on mount
   useEffect(() => {
     const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
     setIsAuthenticated(!!token);
+    if (user) {
+      try {
+        const parsed = JSON.parse(user);
+        setUserRole(parsed.role || null);
+      } catch { setUserRole(null); }
+    }
     setLoading(false);
   }, []);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
+    const user = localStorage.getItem('user');
+    if (user) {
+      try {
+        const parsed = JSON.parse(user);
+        setUserRole(parsed.role || null);
+      } catch { setUserRole(null); }
+    }
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setIsAuthenticated(false);
+    setUserRole(null);
   };
 
   if (loading) {
@@ -43,7 +60,7 @@ function App() {
 
   return (
     <Router>
-      <Navbar isAuthenticated={isAuthenticated} onLogout={handleLogout} />
+      <Navbar isAuthenticated={isAuthenticated} userRole={userRole} onLogout={handleLogout} />
       <Routes>
         <Route path="/" element={isAuthenticated ? <Navigate to="/about" /> : <Home />} />
         <Route path="/about" element={<About />} />
@@ -58,6 +75,10 @@ function App() {
         <Route 
           path="/profile" 
           element={isAuthenticated ? <Profile onLogout={handleLogout} /> : <Navigate to="/login" />} 
+        />
+        <Route 
+          path="/admin" 
+          element={isAuthenticated && userRole === 'admin' ? <AdminDashboard /> : <Navigate to="/" />} 
         />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

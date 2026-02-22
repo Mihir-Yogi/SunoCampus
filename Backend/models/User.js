@@ -104,10 +104,38 @@ const userSchema = new mongoose.Schema({
   // Contributor request
   contributorStatus: {
     type: String,
-    enum: ['none', 'pending', 'approved', 'rejected'],
+    enum: ['none', 'pending', 'approved', 'rejected', 'expired'],
     default: 'none',
   },
+  contributorExpired: {
+    type: Boolean,
+    default: false,
+  },
+  contributorCanReapply: {
+    type: Boolean,
+    default: true,
+  },
   contributorRequestedAt: Date,
+  contributorReason: {
+    type: String,
+    trim: true,
+    maxlength: 500,
+  },
+  contributorDocument: {
+    type: String, // URL/path to uploaded document
+  },
+  contributorDocumentName: {
+    type: String, // Original filename
+  },
+  contributorRejectionReason: {
+    type: String,
+    trim: true,
+  },
+  contributorReviewedAt: Date,
+  contributorReviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
 
   // Timestamps
   lastLogin: Date,

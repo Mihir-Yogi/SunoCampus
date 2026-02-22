@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { HiOutlineShieldCheck, HiOutlineUser } from 'react-icons/hi2';
 
-export const Navbar = ({ isAuthenticated, onLogout }) => {
+export const Navbar = ({ isAuthenticated, userRole, onLogout }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -36,9 +37,20 @@ export const Navbar = ({ isAuthenticated, onLogout }) => {
 
             {isAuthenticated ? (
               <>
-                <Link to="/profile" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-                  👤 Profile
+                {userRole === 'admin' && (
+                  <Link to="/admin" className="text-gray-700 hover:text-red-600 font-medium transition-colors inline-flex items-center gap-1">
+                    <HiOutlineShieldCheck size={18} /> Admin
+                  </Link>
+                )}
+                <Link to="/profile" className="text-gray-700 hover:text-blue-600 font-medium transition-colors inline-flex items-center gap-1">
+                  <HiOutlineUser size={18} /> Profile
                 </Link>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 font-medium transition-colors"
+                >
+                  Logout
+                </button>
               </>
             ) : (
               <>
@@ -83,9 +95,20 @@ export const Navbar = ({ isAuthenticated, onLogout }) => {
 
             {isAuthenticated ? (
               <>
-                <Link to="/profile" className="block py-2 text-gray-700 hover:text-blue-600 transition-colors">
-                  👤 Profile
+                {userRole === 'admin' && (
+                  <Link to="/admin" className="flex items-center gap-1.5 py-2 text-gray-700 hover:text-red-600 transition-colors" onClick={() => setMenuOpen(false)}>
+                    <HiOutlineShieldCheck size={18} /> Admin
+                  </Link>
+                )}
+                <Link to="/profile" className="flex items-center gap-1.5 py-2 text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setMenuOpen(false)}>
+                  <HiOutlineUser size={18} /> Profile
                 </Link>
+                <button
+                  onClick={handleLogout}
+                  className="block w-full mt-2 px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 text-center transition-colors"
+                >
+                  Logout
+                </button>
               </>
             ) : (
               <>

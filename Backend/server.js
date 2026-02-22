@@ -1,9 +1,16 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
 import authRoutes from './routes/auth.js';
 import profileRoutes from './routes/profile.js';
 import collegeRoutes from './routes/colleges.js';
+import adminRoutes from './routes/admin.js';
+import reportRoutes from './routes/reports.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 console.log('\n🔧 Configuration Check:');
 console.log(`  NODE_ENV: ${process.env.NODE_ENV}`);
@@ -23,10 +30,15 @@ app.use(cors({
 // Connect Database
 connectDB();
 
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/colleges', collegeRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Test Route
 app.get('/api/health', (req, res) => {

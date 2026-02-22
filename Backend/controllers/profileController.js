@@ -36,6 +36,12 @@ export const getProfile = async (req, res) => {
         currentYear: user.currentYear || null,
         role: user.role,
         contributorStatus: user.contributorStatus || 'none',
+        contributorReason: user.contributorReason || '',
+        contributorDocument: user.contributorDocument || null,
+        contributorDocumentName: user.contributorDocumentName || null,
+        contributorRejectionReason: user.contributorRejectionReason || null,
+        contributorExpired: user.contributorExpired || false,
+        contributorCanReapply: user.contributorCanReapply !== false,
         isVerified: user.isVerified,
         createdAt: user.createdAt,
       },
@@ -208,12 +214,46 @@ export const applyContributor = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Admins cannot apply for contributor role' });
     }
 
+    if (user.contributorExpired) {
+      return res.status(400).json({ success: false, error: 'Your contributor role has expired. You are no longer eligible to apply.' });
+    }
+
+    if (user.contributorStatus === 'rejected' && !user.contributorCanReapply) {
+      return res.status(400).json({ success: false, error: 'Your previous application was rejected and re-application is not allowed.' });
+    }
+
     if (user.contributorStatus === 'pending') {
       return res.status(400).json({ success: false, error: 'Your application is already pending review' });
     }
 
+    // Check if the user's college already has an active contributor
+    const existingContributor = await User.findOne({
+      college: user.college,
+      role: 'contributor',
+      isActive: true,
+      _id: { $ne: user._id },
+    });
+
+    if (existingContributor) {
+      return res.status(400).json({ success: false, error: 'Your college already has an active contributor. You can apply once the position becomes available.' });
+    }
+
+    // Require document upload
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Please upload a college document (ID card, bonafide certificate, etc.)' });
+    }
+
+    const { reason } = req.body;
+    if (!reason || reason.trim().length < 10) {
+      return res.status(400).json({ success: false, error: 'Please provide a reason (at least 10 characters)' });
+    }
+
     user.contributorStatus = 'pending';
     user.contributorRequestedAt = new Date();
+    user.contributorReason = reason.trim();
+    user.contributorDocument = `/uploads/documents/${req.file.filename}`;
+    user.contributorDocumentName = req.file.originalname;
+    user.contributorRejectionReason = undefined;
     await user.save();
 
     res.json({
@@ -224,6 +264,34 @@ export const applyContributor = async (req, res) => {
   } catch (error) {
     console.error('Apply contributor error:', error);
     res.status(500).json({ success: false, error: 'Server error submitting application' });
+  }
+};
+
+// GET /api/profile/college-contributor — Check if user's college already has an active contributor
+export const checkCollegeContributor = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const existingContributor = await User.findOne({
+      college: user.college,
+      role: 'contributor',
+      isActive: true,
+      _id: { $ne: user._id },
+    }).select('fullName');
+
+    res.json({
+      success: true,
+      data: {
+        hasContributor: !!existingContributor,
+        contributorName: existingContributor?.fullName || null,
+      },
+    });
+  } catch (error) {
+    console.error('Check college contributor error:', error);
+    res.status(500).json({ success: false, error: 'Server error' });
   }
 };
 

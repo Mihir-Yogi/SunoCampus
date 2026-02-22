@@ -39,6 +39,11 @@ const Profile = ({ onLogout }) => {
   });
   const [changingPassword, setChangingPassword] = useState(false);
   const [applyingContributor, setApplyingContributor] = useState(false);
+  const [showApplyForm, setShowApplyForm] = useState(false);
+  const [contributorReason, setContributorReason] = useState('');
+  const [contributorDoc, setContributorDoc] = useState(null);
+  const [collegeHasContributor, setCollegeHasContributor] = useState(false);
+  const [collegeContributorName, setCollegeContributorName] = useState(null);
 
   const showToast = (type, message) => {
     setToast({ type, message });
@@ -50,6 +55,15 @@ const Profile = ({ onLogout }) => {
       const res = await api.get('/profile');
       const data = res.data.data;
       setProfile(data);
+
+      // Check if college already has an active contributor
+      try {
+        const ccRes = await api.get('/profile/college-contributor');
+        setCollegeHasContributor(ccRes.data.data.hasContributor);
+        setCollegeContributorName(ccRes.data.data.contributorName);
+      } catch {
+        // Non-critical, default to false
+      }
 
       setAcademicForm({
         collegeName: data.college?.name || data.collegeName || '',
@@ -148,10 +162,26 @@ const Profile = ({ onLogout }) => {
   };
 
   const handleApplyContributor = async () => {
+    if (!contributorDoc) {
+      showToast('error', 'Please upload a verification document');
+      return;
+    }
+    if (!contributorReason || contributorReason.trim().length < 10) {
+      showToast('error', 'Please provide a reason (at least 10 characters)');
+      return;
+    }
     try {
       setApplyingContributor(true);
-      await api.post('/profile/apply-contributor');
+      const formData = new FormData();
+      formData.append('document', contributorDoc);
+      formData.append('reason', contributorReason.trim());
+      await api.post('/profile/apply-contributor', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       showToast('success', 'Contributor application submitted!');
+      setShowApplyForm(false);
+      setContributorReason('');
+      setContributorDoc(null);
       await fetchProfile();
     } catch (err) {
       showToast('error', err.response?.data?.error || 'Failed to submit application');
@@ -321,8 +351,24 @@ const Profile = ({ onLogout }) => {
             </div>
           </div>
 
-          {/* Become a Contributor Card */}
-          {profile.role === 'student' && (
+          {/* Last-Year Warning for Active Contributors */}
+          {profile.role === 'contributor' && profile.graduationYear && profile.graduationYear <= new Date().getFullYear() && (
+            <div className="bg-amber-50 rounded-xl shadow-sm border border-amber-200 p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+                <h3 className="font-semibold text-amber-800">Last Year Notice</h3>
+              </div>
+              <p className="text-sm text-amber-700">
+                This is your final year as a contributor. Your contributor role will expire after graduation.
+                Thank you for your service to the college!
+              </p>
+            </div>
+          )}
+
+          {/* Become a Contributor Card — hidden if expired or college already has one */}
+          {profile.role === 'student' && !profile.contributorExpired && !collegeHasContributor && profile.contributorStatus !== 'expired' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-amber-500 text-lg">💡</span>
@@ -336,23 +382,117 @@ const Profile = ({ onLogout }) => {
                 post on behalf of your institution.
               </p>
 
-              {profile.contributorStatus === 'none' && (
+              {profile.contributorStatus === 'none' && !showApplyForm && (
                 <button
-                  onClick={handleApplyContributor}
-                  disabled={applyingContributor}
-                  className="w-full py-2.5 rounded-lg text-sm font-semibold border-2 border-amber-400 text-amber-700 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                  onClick={() => setShowApplyForm(true)}
+                  className="w-full py-2.5 rounded-lg text-sm font-semibold border-2 border-amber-400 text-amber-700 hover:bg-amber-50 transition-colors"
                 >
-                  {applyingContributor ? 'Submitting...' : 'Apply for Role'}
+                  Apply for Role
                 </button>
               )}
-              {profile.contributorStatus === 'pending' && (
-                <div className="w-full py-2.5 rounded-lg text-sm font-semibold text-center bg-amber-50 text-amber-700 border border-amber-200">
-                  Application Pending Review
+
+              {(profile.contributorStatus === 'none' || (profile.contributorStatus === 'rejected' && profile.contributorCanReapply)) && showApplyForm && (
+                <div className="space-y-3">
+                  {/* Document Upload */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1.5">Verification Document <span className="text-red-500">*</span></label>
+                    <p className="text-xs text-gray-400 mb-2">Upload your college ID card, bonafide certificate, or any official document (JPG, PNG, PDF — max 5MB)</p>
+                    <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-amber-400 hover:bg-amber-50/30 transition-colors">
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.pdf"
+                        onChange={(e) => setContributorDoc(e.target.files[0] || null)}
+                        className="hidden"
+                      />
+                      {contributorDoc ? (
+                        <div className="flex items-center gap-2 text-sm text-gray-700">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          </svg>
+                          <span className="truncate max-w-[200px]">{contributorDoc.name}</span>
+                          <button type="button" onClick={(e) => { e.preventDefault(); setContributorDoc(null); }} className="ml-1 text-gray-400 hover:text-red-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-1 text-gray-400">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                          </svg>
+                          <span className="text-xs">Click to upload document</span>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+
+                  {/* Reason */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1.5">Why do you want to be a contributor? <span className="text-red-500">*</span></label>
+                    <textarea
+                      value={contributorReason}
+                      onChange={(e) => setContributorReason(e.target.value)}
+                      placeholder="Describe why you'd like to represent your college..."
+                      rows={3}
+                      maxLength={500}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none resize-none transition-colors"
+                    />
+                    <p className="text-xs text-gray-400 mt-1 text-right">{contributorReason.length} / 500</p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleApplyContributor}
+                      disabled={applyingContributor}
+                      className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+                    >
+                      {applyingContributor ? 'Submitting...' : 'Submit Application'}
+                    </button>
+                    <button
+                      onClick={() => { setShowApplyForm(false); setContributorDoc(null); setContributorReason(''); }}
+                      className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
-              {profile.contributorStatus === 'rejected' && (
-                <div className="w-full py-2.5 rounded-lg text-sm font-semibold text-center bg-red-50 text-red-600 border border-red-200">
-                  Application was not approved
+
+              {profile.contributorStatus === 'pending' && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    <span className="text-sm font-semibold text-amber-800">Request Pending</span>
+                  </div>
+                  <p className="text-xs text-amber-700">Your contributor request is in the pending phase. An admin will review your application and document shortly.</p>
+                </div>
+              )}
+
+              {profile.contributorStatus === 'rejected' && !showApplyForm && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    <span className="text-sm font-semibold text-red-700">Application Not Approved</span>
+                  </div>
+                  <p className="text-xs text-red-600 mb-2">
+                    {profile.contributorRejectionReason || 'Unfortunately, your contributor application was not approved by the admin.'}
+                  </p>
+                  {profile.contributorCanReapply ? (
+                    <button
+                      onClick={() => setShowApplyForm(true)}
+                      className="w-full py-2 rounded-lg text-sm font-semibold border-2 border-amber-400 text-amber-700 hover:bg-amber-50 transition-colors"
+                    >
+                      Re-apply for Contributor
+                    </button>
+                  ) : (
+                    <p className="text-xs text-red-500 font-medium mt-1">You are not eligible to re-apply for the contributor role.</p>
+                  )}
                 </div>
               )}
             </div>
