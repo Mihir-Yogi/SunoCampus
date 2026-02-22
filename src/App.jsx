@@ -45,7 +45,7 @@ function App() {
     <Router>
       <Navbar isAuthenticated={isAuthenticated} onLogout={handleLogout} />
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={isAuthenticated ? <Navigate to="/about" /> : <Home />} />
         <Route path="/about" element={<About />} />
         <Route 
           path="/login" 
@@ -53,7 +53,7 @@ function App() {
         />
         <Route 
           path="/register" 
-          element={isAuthenticated ? <Navigate to="/about" /> : <Register />} 
+          element={isAuthenticated ? <Navigate to="/about" /> : <Register onLogin={handleLogin} />} 
         />
         <Route 
           path="/profile" 

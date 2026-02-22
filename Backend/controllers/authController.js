@@ -130,14 +130,32 @@ export const register = async (req, res) => {
       phone,
       dateOfBirth,
       gender,
+      college,
       studentId,
       branch,
+      currentYear,
       graduationYear,
     } = req.body;
 
     // Validate inputs
     if (!email || !password || !confirmPassword || !fullName) {
       return res.status(400).json({ error: 'Required fields missing' });
+    }
+
+    if (!college) {
+      return res.status(400).json({ error: 'College selection is required' });
+    }
+
+    if (!studentId || !/^\d{11}$/.test(studentId)) {
+      return res.status(400).json({ error: 'Enrollment number must be exactly 11 digits' });
+    }
+
+    if (!branch) {
+      return res.status(400).json({ error: 'Branch selection is required' });
+    }
+
+    if (!currentYear || currentYear < 1 || currentYear > 4) {
+      return res.status(400).json({ error: 'Current year must be between 1 and 4' });
     }
 
     if (password !== confirmPassword) {
@@ -156,10 +174,15 @@ export const register = async (req, res) => {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Get college
-    const college = await getCollegeFromEmail(email);
-    if (!college) {
-      return res.status(400).json({ error: 'College not found for this email domain' });
+    // Check if student ID already exists for this college
+    const duplicateRegistration = await User.findOne({
+      college: college,
+      studentId: studentId,
+    });
+    if (duplicateRegistration) {
+      return res.status(400).json({ 
+        error: `This enrollment number is already registered with the selected college` 
+      });
     }
 
     // Hash password
@@ -173,9 +196,10 @@ export const register = async (req, res) => {
       phone,
       dateOfBirth,
       gender,
-      college: college._id,
+      college: college,
       studentId,
       branch,
+      currentYear,
       graduationYear,
       isVerified: true, // Email already verified via OTP
       role: 'student',
@@ -199,6 +223,17 @@ export const register = async (req, res) => {
     });
   } catch (error) {
     console.error('Register error:', error);
+    
+    // Handle mongoose unique constraint error
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      if (field === 'email') {
+        return res.status(400).json({ error: 'Email already registered' });
+      } else if (field === 'studentId') {
+        return res.status(400).json({ error: 'Enrollment number already registered for this college' });
+      }
+    }
+    
     res.status(500).json({ error: 'Server error during registration' });
   }
 };
@@ -322,4 +357,32 @@ export const googleLogin = async (req, res) => {
   }
 };
 
-export default { sendOTP, verifyOTP, register, login, googleLogin };
+// Check if enrollment number is already registered for a college
+export const checkEnrollment = async (req, res) => {
+  try {
+    const { college, studentId } = req.body;
+
+    if (!college || !studentId) {
+      return res.status(400).json({ error: 'College and enrollment number are required' });
+    }
+
+    if (!/^\d{11}$/.test(studentId)) {
+      return res.status(400).json({ error: 'Enrollment number must be exactly 11 digits' });
+    }
+
+    const existingUser = await User.findOne({ college, studentId });
+
+    res.json({
+      success: true,
+      available: !existingUser,
+      message: existingUser
+        ? 'This enrollment number is already registered with the selected college'
+        : 'Enrollment number is available',
+    });
+  } catch (error) {
+    console.error('Check enrollment error:', error);
+    res.status(500).json({ error: 'Server error checking enrollment' });
+  }
+};
+
+export default { sendOTP, verifyOTP, register, login, googleLogin, checkEnrollment };

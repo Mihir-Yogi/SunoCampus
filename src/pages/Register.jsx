@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FormInput from '../components/FormInput';
 import PrimaryButton from '../components/PrimaryButton';
@@ -6,11 +6,12 @@ import Toast from '../components/Toast';
 import OTPInput from '../components/OTPInput';
 import api from '../services/api';
 
-const Register = () => {
+const Register = ({ onLogin }) => {
   const navigate = useNavigate();
   const [toasts, setToasts] = useState([]);
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [colleges, setColleges] = useState([]);
 
   // Step 1: Email & OTP
   const [email, setEmail] = useState('');
@@ -29,9 +30,11 @@ const Register = () => {
 
   // Step 3: College Details
   const [collegeData, setCollegeData] = useState({
+    college: '',
     studentId: '',
     branch: '',
-    graduationYear: new Date().getFullYear() + 4,
+    currentYear: '',
+    graduationYear: '',
   });
 
   // Step 4: Password
@@ -39,6 +42,48 @@ const Register = () => {
     password: '',
     confirmPassword: '',
   });
+
+  // Handle Enter key to submit current step
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        // Skip auto-submit when a select dropdown is focused
+        if (document.activeElement?.tagName === 'SELECT') return;
+        e.preventDefault();
+        if (currentStep === 1) {
+          if (!otpSent) {
+            handleSendOTP();
+          }
+          // OTP auto-verifies on 6 digits, no action needed here
+        } else if (currentStep === 2) {
+          handlePersonalDetailsNext();
+        } else if (currentStep === 3) {
+          handleCollegeDetailsNext();
+        } else if (currentStep === 4) {
+          handleRegisterComplete();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentStep, otpSent, loading, email, otp, emailVerified, formData, collegeData, passwords]);
+
+  // Fetch colleges on component mount
+  useEffect(() => {
+    const fetchColleges = async () => {
+      try {
+        const response = await api.get('/colleges');
+        if (response.data.success) {
+          setColleges(response.data.colleges);
+        }
+      } catch (error) {
+        console.error('Failed to fetch colleges:', error);
+        addToast('error', 'Failed to load college list');
+      }
+    };
+    fetchColleges();
+  }, []);
 
   // Add toast notification
   const addToast = (type, message) => {
@@ -90,15 +135,16 @@ const Register = () => {
   };
 
   // Step 1: Verify OTP
-  const handleVerifyOTP = async () => {
+  const handleVerifyOTP = async (otpValue) => {
+    const otpToVerify = otpValue || otp;
     try {
-      if (!otp || otp.length !== 6) {
+      if (!otpToVerify || otpToVerify.length !== 6) {
         addToast('error', 'Please enter a valid 6-digit OTP');
         return;
       }
 
       setLoading(true);
-      const response = await api.post('/auth/verify-otp', { email, otp });
+      const response = await api.post('/auth/verify-otp', { email, otp: otpToVerify });
 
       if (response.data.success) {
         addToast('success', 'Email verified successfully');
@@ -112,6 +158,13 @@ const Register = () => {
       setLoading(false);
     }
   };
+
+  // Auto-verify OTP when all 6 digits are entered
+  useEffect(() => {
+    if (otp.length === 6 && otpSent && !emailVerified && !loading) {
+      handleVerifyOTP(otp);
+    }
+  }, [otp]);
 
   // Step 2: Handle personal details
   const handlePersonalDetailsChange = (e) => {
@@ -146,27 +199,85 @@ const Register = () => {
   // Step 3: Handle college details
   const handleCollegeDetailsChange = (e) => {
     const { name, value } = e.target;
+    
+    // For studentId, only allow digits and limit to 11 characters
+    if (name === 'studentId') {
+      const digitsOnly = value.replace(/\D/g, '').slice(0, 11);
+      setCollegeData((prev) => ({
+        ...prev,
+        [name]: digitsOnly,
+      }));
+      return;
+    }
+    
+    // For currentYear, auto-calculate graduation year
+    if (name === 'currentYear') {
+      const year = parseInt(value);
+      let calculatedGraduationYear = '';
+      if (year) {
+        // Assuming 4-year degree program
+        // If 1st year: graduate in 3 years
+        // If 2nd year: graduate in 2 years
+        // If 3rd year: graduate in 1 year
+        // If 4th year: graduate this year
+        const yearsRemaining = 4 - year;
+        calculatedGraduationYear = new Date().getFullYear() + yearsRemaining;
+      }
+      setCollegeData((prev) => ({
+        ...prev,
+        [name]: value,
+        graduationYear: calculatedGraduationYear,
+      }));
+      return;
+    }
+    
     setCollegeData((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  const handleCollegeDetailsNext = () => {
+  const handleCollegeDetailsNext = async () => {
+    if (!collegeData.college) {
+      addToast('error', 'Please select your college');
+      return;
+    }
     if (!collegeData.studentId) {
-      addToast('error', 'Please enter your student ID');
+      addToast('error', 'Please enter your enrollment number');
+      return;
+    }
+    if (collegeData.studentId.length !== 11) {
+      addToast('error', 'Enrollment number must be exactly 11 digits');
       return;
     }
     if (!collegeData.branch) {
       addToast('error', 'Please select your branch');
       return;
     }
-    if (!collegeData.graduationYear) {
-      addToast('error', 'Please select your graduation year');
+    if (!collegeData.currentYear) {
+      addToast('error', 'Please select your current year');
       return;
     }
 
-    setCurrentStep(4);
+    // Check enrollment availability against database
+    try {
+      setLoading(true);
+      const response = await api.post('/auth/check-enrollment', {
+        college: collegeData.college,
+        studentId: collegeData.studentId,
+      });
+
+      if (!response.data.available) {
+        addToast('error', response.data.message);
+        return;
+      }
+
+      setCurrentStep(4);
+    } catch (error) {
+      addToast('error', error.response?.data?.error || 'Failed to verify enrollment number');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Step 4: Handle passwords
@@ -208,8 +319,10 @@ const Register = () => {
         phone: formData.phone,
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender,
+        college: collegeData.college,
         studentId: collegeData.studentId,
         branch: collegeData.branch,
+        currentYear: collegeData.currentYear,
         graduationYear: collegeData.graduationYear,
       };
 
@@ -218,6 +331,7 @@ const Register = () => {
       if (response.data.success) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
+        if (onLogin) onLogin();
         addToast('success', 'Account created successfully!');
         setTimeout(() => {
           navigate('/about');
@@ -237,50 +351,57 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4 pt-20 pb-12">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-100 px-4 pt-20 pb-12">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-white mb-3">Join SunoCampus</h1>
-          <p className="text-slate-400">Create your account to connect with your campus community</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-3">Join SunoCampus</h1>
+          <p className="text-gray-600">Create your account to connect with your campus community</p>
         </div>
 
         {/* Progress Steps */}
-        <div className="flex justify-between mb-10">
+        <div className="relative flex justify-between items-start mb-10">
+          {/* Connecting line behind circles */}
+          <div className="absolute top-5 left-0 right-0 flex px-[calc(12.5%)]">
+            {[1, 2, 3].map((step) => (
+              <div key={`line-${step}`} className="flex-1 h-1 mx-1">
+                <div
+                  className={`h-full rounded transition-all duration-300 ${
+                    step < currentStep ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Step circles */}
           {[1, 2, 3, 4].map((step) => (
-            <div key={step} className="flex flex-col items-center flex-1">
+            <div key={step} className="flex flex-col items-center flex-1 z-10">
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all duration-300 ${
                   step <= currentStep
                     ? 'bg-blue-600 text-white'
-                    : 'bg-slate-700 text-slate-400'
+                    : 'bg-gray-300 text-gray-600'
                 }`}
               >
                 {step}
               </div>
-              <span className="text-xs text-slate-500 mt-2">
+              <span className="text-xs text-gray-600 mt-2">
                 {['Email', 'Details', 'College', 'Password'][step - 1]}
               </span>
-              {step < 4 && (
-                <div
-                  className={`h-1 w-full mt-4 transition-all duration-300 ${
-                    step < currentStep ? 'bg-blue-600' : 'bg-slate-700'
-                  }`}
-                />
-              )}
             </div>
           ))}
         </div>
 
         {/* Form Container */}
-        <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-8 shadow-2xl">
+        <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-200">
           {/* Step 1: Email & OTP */}
           {currentStep === 1 && (
             <div className="space-y-6 animate-fadeIn">
-              <h2 className="text-2xl font-bold text-white mb-6">Verify Your Email</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Verify Your Email</h2>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   College Email Address
                 </label>
                 <input
@@ -288,10 +409,10 @@ const Register = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="student@college.edu"
-                  disabled={emailVerified}
-                  className="w-full px-4 py-3 rounded-lg bg-slate-700/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={otpSent || emailVerified}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-white"
                 />
-                <p className="text-xs text-slate-500 mt-2">Use your official college email address</p>
+                <p className="text-xs text-gray-500 mt-2">Use your official college email address</p>
               </div>
 
               {!emailVerified ? (
@@ -308,28 +429,25 @@ const Register = () => {
                   {otpSent && (
                     <div className="space-y-4 animate-slideDown">
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-4 text-center">
+                        <label className="block text-sm font-medium text-gray-700 mb-4 text-center">
                           Enter 6-Digit OTP
                         </label>
                         <OTPInput 
                           value={otp} 
                           onChange={setOTP}
                           length={6}
+                          autoFocus={true}
                         />
+                        {loading && (
+                          <p className="text-sm text-blue-600 text-center mt-3 animate-pulse">Verifying OTP...</p>
+                        )}
                       </div>
-                      <PrimaryButton
-                        onClick={handleVerifyOTP}
-                        loading={loading}
-                        className="w-full"
-                      >
-                        Verify OTP
-                      </PrimaryButton>
                     </div>
                   )}
                 </>
               ) : (
-                <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                  <p className="text-green-400 font-medium">✓ Email verified</p>
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-green-700 font-medium">✓ Email verified</p>
                 </div>
               )}
             </div>
@@ -338,7 +456,7 @@ const Register = () => {
           {/* Step 2: Personal Details */}
           {currentStep === 2 && (
             <div className="space-y-6 animate-fadeIn">
-              <h2 className="text-2xl font-bold text-white mb-6">Personal Details</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Personal Details</h2>
 
               <FormInput
                 label="Full Name"
@@ -355,6 +473,7 @@ const Register = () => {
                 value={formData.phone}
                 onChange={handlePersonalDetailsChange}
                 placeholder="+91 9XXXXXXXXX"
+                validation={(value) => /^\d{10,11}$/.test(value)}
               />
 
               <FormInput
@@ -366,12 +485,12 @@ const Register = () => {
               />
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Gender</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
                 <select
                   name="gender"
                   value={formData.gender}
                   onChange={handlePersonalDetailsChange}
-                  className="w-full px-4 py-3 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
                 >
                   <option value="">Select Gender</option>
                   <option value="male">Male</option>
@@ -401,23 +520,40 @@ const Register = () => {
           {/* Step 3: College Details */}
           {currentStep === 3 && (
             <div className="space-y-6 animate-fadeIn">
-              <h2 className="text-2xl font-bold text-white mb-6">College Information</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">College Information</h2>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">College Name *</label>
+                <select
+                  value={collegeData.college}
+                  onChange={(e) => setCollegeData(prev => ({ ...prev, college: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
+                >
+                  <option value="">Select Your College</option>
+                  {colleges.map((college) => (
+                    <option key={college._id} value={college._id}>
+                      {college.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               <FormInput
-                label="Student ID"
+                label="Enrollment Number"
                 name="studentId"
                 value={collegeData.studentId}
                 onChange={handleCollegeDetailsChange}
-                placeholder="E.g., 2024CS001"
+                placeholder="E.g., 24172012093"
+                validation={(value) => /^\d{11}$/.test(value)}
               />
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Branch/Course</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Branch/Course</label>
                 <select
                   name="branch"
                   value={collegeData.branch}
                   onChange={handleCollegeDetailsChange}
-                  className="w-full px-4 py-3 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
                 >
                   <option value="">Select Branch</option>
                   <option value="CSE">Computer Science</option>
@@ -431,25 +567,28 @@ const Register = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Expected Graduation Year
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Current Year *</label>
                 <select
-                  name="graduationYear"
-                  value={collegeData.graduationYear}
+                  name="currentYear"
+                  value={collegeData.currentYear}
                   onChange={handleCollegeDetailsChange}
-                  className="w-full px-4 py-3 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
                 >
-                  {[...Array(6)].map((_, i) => {
-                    const year = new Date().getFullYear() + i;
-                    return (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    );
-                  })}
+                  <option value="">Select Your Current Year</option>
+                  <option value="1">1st Year</option>
+                  <option value="2">2nd Year</option>
+                  <option value="3">3rd Year</option>
+                  <option value="4">4th Year</option>
                 </select>
               </div>
+
+              {collegeData.currentYear && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-900 font-medium">
+                    Expected Graduation Year: <span className="font-bold text-lg text-blue-600">{collegeData.graduationYear}</span>
+                  </p>
+                </div>
+              )}
 
               <div className="flex gap-4">
                 <PrimaryButton
@@ -461,9 +600,10 @@ const Register = () => {
                 </PrimaryButton>
                 <PrimaryButton
                   onClick={handleCollegeDetailsNext}
+                  loading={loading}
                   className="flex-1"
                 >
-                  Next
+                  {loading ? 'Verifying...' : 'Next'}
                 </PrimaryButton>
               </div>
             </div>
@@ -472,7 +612,7 @@ const Register = () => {
           {/* Step 4: Password */}
           {currentStep === 4 && (
             <div className="space-y-6 animate-fadeIn">
-              <h2 className="text-2xl font-bold text-white mb-6">Set Your Password</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Set Your Password</h2>
 
               <FormInput
                 label="Password"
@@ -494,9 +634,9 @@ const Register = () => {
                 hideSuccessIcon={true}
               />
 
-              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <p className="text-xs text-blue-300 mb-2 font-semibold">Password requirements:</p>
-                <ul className="text-xs text-blue-300 space-y-1">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-900 mb-2 font-semibold">Password requirements:</p>
+                <ul className="text-xs text-blue-800 space-y-1">
                   <li>• At least 8 characters long</li>
                   <li>• Contains uppercase and lowercase letters</li>
                   <li>• Contains numbers and special characters (@$!%*?&)</li>
@@ -520,7 +660,7 @@ const Register = () => {
                 </PrimaryButton>
               </div>
 
-              <p className="text-xs text-slate-500 text-center">
+              <p className="text-xs text-gray-600 text-center">
                 By registering, you agree to our Terms & Conditions
               </p>
             </div>
@@ -528,11 +668,11 @@ const Register = () => {
         </div>
 
         {/* Sign In Link */}
-        <p className="text-center text-slate-400 mt-8">
+        <p className="text-center text-gray-600 mt-8">
           Already have an account?{' '}
           <button
             onClick={() => navigate('/login')}
-            className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+            className="text-blue-600 hover:text-blue-700 font-semibold transition-colors"
           >
             Sign In
           </button>

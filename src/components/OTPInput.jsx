@@ -1,7 +1,14 @@
 import { useRef, useEffect } from 'react';
 
-export const OTPInput = ({ value, onChange, length = 6 }) => {
+export const OTPInput = ({ value, onChange, length = 6, autoFocus = false }) => {
   const inputRefs = useRef([]);
+
+  // Auto-focus the first input when component mounts
+  useEffect(() => {
+    if (autoFocus) {
+      inputRefs.current[0]?.focus();
+    }
+  }, [autoFocus]);
 
   const handleChange = (e, index) => {
     const val = e.target.value;
@@ -66,7 +73,7 @@ export const OTPInput = ({ value, onChange, length = 6 }) => {
           onChange={(e) => handleChange(e, index)}
           onKeyDown={(e) => handleKeyDown(e, index)}
           onPaste={handlePaste}
-          className="w-12 h-12 text-center text-2xl font-bold rounded-lg bg-slate-700/50 border-2 border-slate-600 text-white hover:border-blue-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+          className="w-12 h-12 text-center text-2xl font-bold rounded-lg bg-white border-2 border-gray-300 text-gray-900 hover:border-blue-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm"
           placeholder="0"
         />
       ))}

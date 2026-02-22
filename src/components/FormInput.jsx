@@ -12,6 +12,7 @@ export const FormInput = ({
   required = false,
   disabled = false,
   hideSuccessIcon = false,
+  isDarkMode = false,
   ...props
 }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -29,9 +30,11 @@ export const FormInput = ({
   return (
     <div className="mb-5">
       {label && (
-        <label className="block text-sm font-medium text-gray-900 mb-2">
+        <label className={`block text-sm font-medium mb-2 ${
+          isDarkMode ? 'text-slate-300' : 'text-gray-700'
+        }`}>
           {label}
-          {required && <span className="text-red-600 ml-1">*</span>}
+          {required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
       
@@ -39,13 +42,15 @@ export const FormInput = ({
         <div
           className={`relative flex items-center transition-all duration-300 ${
             isFocused
-              ? 'ring-2 ring-blue-600 ring-offset-0'
-              : 'ring-1 ring-gray-300'
+              ? isDarkMode ? 'ring-2 ring-blue-500 ring-offset-0' : 'ring-2 ring-blue-600 ring-offset-0'
+              : isDarkMode ? 'ring-1 ring-slate-600' : 'ring-1 ring-gray-300'
           } ${
             isInvalid && 'ring-red-500'
           } ${
             isValid && 'ring-green-500'
-          } rounded-lg overflow-hidden bg-white`}
+          } rounded-lg overflow-hidden ${
+            isDarkMode ? 'bg-slate-700/50' : 'bg-white'
+          }`}
         >
           {/* Input */}
           <input
@@ -56,7 +61,9 @@ export const FormInput = ({
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             disabled={disabled}
-            className={`w-full px-4 py-3 bg-transparent outline-none transition-all duration-300 text-gray-900 placeholder-gray-500 disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`w-full px-4 py-3 bg-transparent outline-none transition-all duration-300 ${
+              isDarkMode ? 'text-white placeholder-slate-500' : 'text-gray-900 placeholder-gray-500'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
             {...props}
           />
 
@@ -84,14 +91,16 @@ export const FormInput = ({
 
         {/* Error message */}
         {isInvalid && (
-          <p className="mt-2 text-sm text-red-600 flex items-center gap-1 animate-slideDown">
+          <p className="mt-2 text-sm text-red-500 flex items-center gap-1 animate-slideDown">
             {error}
           </p>
         )}
 
         {/* Hint text */}
         {hint && !error && (
-          <p className="mt-2 text-sm text-gray-500">ℹ️ {hint}</p>
+          <p className={`mt-2 text-sm ${
+            isDarkMode ? 'text-slate-400' : 'text-gray-500'
+          }`}>ℹ️ {hint}</p>
         )}
       </div>
     </div>

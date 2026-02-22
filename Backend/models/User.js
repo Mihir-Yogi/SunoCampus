@@ -44,6 +44,12 @@ const userSchema = new mongoose.Schema({
   studentId: {
     type: String,
     required: [true, 'Student ID is required'],
+    validate: {
+      validator: function(v) {
+        return /^\d{11}$/.test(v);
+      },
+      message: 'Student ID must be exactly 11 digits'
+    }
   },
   branch: {
     type: String,
@@ -108,5 +114,8 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true,
 });
+
+// Compound unique index on college and studentId
+userSchema.index({ college: 1, studentId: 1 }, { unique: true });
 
 export default mongoose.model('User', userSchema);

@@ -25,9 +25,11 @@ export const Navbar = ({ isAuthenticated, onLogout }) => {
 
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-              Home
-            </Link>
+            {!isAuthenticated && (
+              <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
+                Home
+              </Link>
+            )}
             <Link to="/about" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
               About
             </Link>
@@ -70,9 +72,11 @@ export const Navbar = ({ isAuthenticated, onLogout }) => {
         {/* Mobile Menu */}
         {menuOpen && (
           <div className="md:hidden pb-4 border-t animate-slideDown">
-            <Link to="/" className="block py-2 text-gray-700 hover:text-blue-600 transition-colors">
-              Home
-            </Link>
+            {!isAuthenticated && (
+              <Link to="/" className="block py-2 text-gray-700 hover:text-blue-600 transition-colors">
+                Home
+              </Link>
+            )}
             <Link to="/about" className="block py-2 text-gray-700 hover:text-blue-600 transition-colors">
               About
             </Link>
