@@ -27,10 +27,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid - clear storage and redirect to login
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Don't redirect if we're on an auth endpoint (login/register) —
+      // let the component handle the 401 error and show the message.
+      const url = error.config?.url || '';
+      const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/google');
+      if (!isAuthEndpoint) {
+        // Token expired or invalid — clear storage and redirect to login
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     console.error('API Error:', error.response?.data || error.message);
     return Promise.reject(error);

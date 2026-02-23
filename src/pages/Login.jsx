@@ -90,18 +90,17 @@ export default function Login({ onLogin }) {
           localStorage.setItem('rememberMe', 'true');
         }
 
-        // Call the onLogin callback to update parent state
-        onLogin?.();
-
         setToast({
           type: 'success',
           message: 'Login successful! Redirecting...'
         });
 
-        // Redirect after short delay
+        // Navigate first, then update auth state so the route guard
+        // doesn't race and cause a flicker to /browse
         setTimeout(() => {
           navigate('/about');
-        }, 1500);
+          onLogin?.();
+        }, 1000);
       }
     } catch (error) {
       const errorMessage = error.response?.data?.error || 'Login failed. Please try again.';
@@ -195,7 +194,7 @@ export default function Login({ onLogin }) {
                   </span>
                 </label>
                 <Link
-                  to="#"
+                  to="/forgot-password"
                   className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
                 >
                   Forgot Password?

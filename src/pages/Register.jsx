@@ -331,11 +331,13 @@ const Register = ({ onLogin }) => {
       if (response.data.success) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        if (onLogin) onLogin();
         addToast('success', 'Account created successfully!');
+        // Navigate first, then update auth state so the route guard
+        // doesn't race and cause a flicker
         setTimeout(() => {
           navigate('/about');
-        }, 1500);
+          if (onLogin) onLogin();
+        }, 1000);
       }
     } catch (error) {
       addToast('error', error.response?.data?.error || 'Registration failed');
@@ -543,7 +545,7 @@ const Register = ({ onLogin }) => {
                 name="studentId"
                 value={collegeData.studentId}
                 onChange={handleCollegeDetailsChange}
-                placeholder="E.g., 24172012093"
+                placeholder="E.g., 24172012..."
                 validation={(value) => /^\d{11}$/.test(value)}
               />
 

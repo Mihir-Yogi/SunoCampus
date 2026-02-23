@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Toast } from '../components/Toast';
 import api from '../services/api';
 
-const Profile = ({ onLogout }) => {
+const Profile = ({ onLogout, onRoleSync }) => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -56,6 +56,17 @@ const Profile = ({ onLogout }) => {
       const data = res.data.data;
       setProfile(data);
 
+      // Sync role to localStorage if it changed (e.g. contributor approved)
+      try {
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (data.role && storedUser.role !== data.role) {
+          storedUser.role = data.role;
+          localStorage.setItem('user', JSON.stringify(storedUser));
+          // Notify App to update navbar/routes
+          if (onRoleSync) onRoleSync();
+        }
+      } catch { /* ignore */ }
+
       // Check if college already has an active contributor
       try {
         const ccRes = await api.get('/profile/college-contributor');
@@ -91,7 +102,7 @@ const Profile = ({ onLogout }) => {
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
+  }, [navigate, onRoleSync]);
 
   useEffect(() => {
     fetchProfile();

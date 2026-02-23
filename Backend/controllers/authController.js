@@ -385,4 +385,164 @@ export const checkEnrollment = async (req, res) => {
   }
 };
 
-export default { sendOTP, verifyOTP, register, login, googleLogin, checkEnrollment };
+// ─── Forgot Password: Step 1 — Send OTP ─────────────────────
+export const forgotPasswordSendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || !validateEmailFormat(email)) {
+      return res.status(400).json({ error: 'Please enter a valid email address' });
+    }
+
+    // Check if user exists
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: 'No account found with this email' });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ error: 'This account has been deactivated' });
+    }
+
+    // Delete any existing OTP for this email
+    await OTP.deleteMany({ email });
+
+    // Generate and save OTP
+    const otpCode = generateOTP();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await new OTP({ email, otp: otpCode, expiresAt }).save();
+
+    // Send email
+    const { sendPasswordResetOTPEmail } = await import('../utils/emailService.js');
+    const emailSent = await sendPasswordResetOTPEmail(email, otpCode, user.fullName);
+
+    if (!emailSent) {
+      return res.status(500).json({ error: 'Failed to send verification email. Please try again.' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Verification code sent to your email',
+      email,
+    });
+  } catch (error) {
+    console.error('Forgot password send OTP error:', error);
+    res.status(500).json({ error: 'Server error. Please try again later.' });
+  }
+};
+
+// ─── Forgot Password: Step 2 — Verify OTP ────────────────────
+export const forgotPasswordVerifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and verification code are required' });
+    }
+
+    // Find the OTP record
+    const otpRecord = await OTP.findOne({ email });
+
+    if (!otpRecord) {
+      return res.status(400).json({ error: 'Verification code expired. Please request a new one.' });
+    }
+
+    // Check expiry
+    if (new Date() > otpRecord.expiresAt) {
+      await OTP.deleteMany({ email });
+      return res.status(400).json({ error: 'Verification code expired. Please request a new one.' });
+    }
+
+    // Check max attempts
+    if (otpRecord.attempts >= 3) {
+      await OTP.deleteMany({ email });
+      return res.status(429).json({ error: 'Too many attempts. Please request a new code.' });
+    }
+
+    // Verify OTP
+    if (otpRecord.otp !== otp) {
+      otpRecord.attempts += 1;
+      await otpRecord.save();
+      const remaining = 3 - otpRecord.attempts;
+      return res.status(400).json({
+        error: `Invalid code. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`,
+      });
+    }
+
+    // OTP is valid — generate a short-lived reset token
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const resetToken = jwt.sign(
+      { id: user._id, purpose: 'password-reset' },
+      process.env.JWT_SECRET || 'your_super_secret_key_change_in_production',
+      { expiresIn: '15m' }
+    );
+
+    // Clean up OTP
+    await OTP.deleteMany({ email });
+
+    res.json({
+      success: true,
+      message: 'Email verified successfully',
+      resetToken,
+    });
+  } catch (error) {
+    console.error('Forgot password verify OTP error:', error);
+    res.status(500).json({ error: 'Server error. Please try again later.' });
+  }
+};
+
+// ─── Forgot Password: Step 3 — Reset Password ────────────────
+export const forgotPasswordReset = async (req, res) => {
+  try {
+    const { resetToken, newPassword } = req.body;
+
+    if (!resetToken || !newPassword) {
+      return res.status(400).json({ error: 'Reset token and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    // Verify the reset token
+    let decoded;
+    try {
+      decoded = jwt.verify(
+        resetToken,
+        process.env.JWT_SECRET || 'your_super_secret_key_change_in_production'
+      );
+    } catch (err) {
+      return res.status(401).json({ error: 'Reset link has expired. Please start over.' });
+    }
+
+    if (decoded.purpose !== 'password-reset') {
+      return res.status(401).json({ error: 'Invalid reset token' });
+    }
+
+    // Find user and update password
+    const user = await User.findById(decoded.id).select('+password');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(12);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully. You can now log in with your new password.',
+    });
+  } catch (error) {
+    console.error('Forgot password reset error:', error);
+    res.status(500).json({ error: 'Server error. Please try again later.' });
+  }
+};
+
+export default { sendOTP, verifyOTP, register, login, googleLogin, checkEnrollment, forgotPasswordSendOTP, forgotPasswordVerifyOTP, forgotPasswordReset };

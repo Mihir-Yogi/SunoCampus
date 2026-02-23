@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
+import api from "./services/api";
 import Home from "./pages/Home";
 import About from "./pages/About";
 import Login from "./pages/Login";
@@ -7,6 +8,9 @@ import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/AdminDashboard";
 import ContributorDashboard from "./pages/ContributorDashboard";
+import Browse from "./pages/Browse";
+import PublicProfile from "./pages/PublicProfile";
+import ForgotPassword from "./pages/ForgotPassword";
 import { Navbar } from "./components/Navbar";
 
 // Wrapper to conditionally hide Navbar on full-page layouts
@@ -38,7 +42,35 @@ function App() {
       } catch { setUserRole(null); }
     }
     setLoading(false);
+
+    // Also fetch fresh role from server to handle role changes (e.g. contributor approval)
+    if (token) {
+      api.get('/profile').then(res => {
+        const freshRole = res.data?.data?.role;
+        if (freshRole) {
+          try {
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            if (storedUser.role !== freshRole) {
+              storedUser.role = freshRole;
+              localStorage.setItem('user', JSON.stringify(storedUser));
+              setUserRole(freshRole);
+            }
+          } catch { /* ignore */ }
+        }
+      }).catch(() => { /* ignore - user will see stale role until profile visit */ });
+    }
   }, []);
+
+  // Re-sync role from localStorage (called when profile detects role change)
+  const syncRole = () => {
+    const user = localStorage.getItem('user');
+    if (user) {
+      try {
+        const parsed = JSON.parse(user);
+        setUserRole(parsed.role || null);
+      } catch { setUserRole(null); }
+    }
+  };
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -75,7 +107,7 @@ function App() {
     <Router>
       <AppLayout isAuthenticated={isAuthenticated} userRole={userRole} onLogout={handleLogout}>
         <Routes>
-          <Route path="/" element={isAuthenticated ? <Navigate to="/about" /> : <Home />} />
+          <Route path="/" element={isAuthenticated ? <Navigate to="/browse" /> : <Home />} />
           <Route path="/about" element={<About />} />
           <Route 
             path="/login" 
@@ -86,8 +118,16 @@ function App() {
             element={isAuthenticated ? <Navigate to="/about" /> : <Register onLogin={handleLogin} />} 
           />
           <Route 
+            path="/forgot-password" 
+            element={isAuthenticated ? <Navigate to="/about" /> : <ForgotPassword />} 
+          />
+          <Route 
+            path="/browse" 
+            element={isAuthenticated ? <Browse onRoleSync={syncRole} /> : <Navigate to="/login" />} 
+          />
+          <Route 
             path="/profile" 
-            element={isAuthenticated ? <Profile onLogout={handleLogout} /> : <Navigate to="/login" />} 
+            element={isAuthenticated && userRole !== 'admin' ? <Profile onLogout={handleLogout} onRoleSync={syncRole} /> : <Navigate to={isAuthenticated ? '/admin' : '/login'} />} 
           />
           <Route 
             path="/admin" 
@@ -95,7 +135,11 @@ function App() {
           />
           <Route 
             path="/contributor" 
-            element={isAuthenticated && (userRole === 'contributor' || userRole === 'admin') ? <ContributorDashboard onLogout={handleLogout} /> : <Navigate to="/" />} 
+            element={isAuthenticated && userRole === 'contributor' ? <ContributorDashboard onLogout={handleLogout} /> : <Navigate to="/" />} 
+          />
+          <Route 
+            path="/user/:id" 
+            element={isAuthenticated ? <PublicProfile /> : <Navigate to="/login" />} 
           />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

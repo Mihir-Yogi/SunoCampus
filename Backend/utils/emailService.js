@@ -97,4 +97,41 @@ export const sendContributorApprovalEmail = async (email, fullName) => {
   }
 };
 
+// Send password reset OTP email
+export const sendPasswordResetOTPEmail = async (email, otp, fullName) => {
+  try {
+    if (!transporter || !emailUser || !emailPass) {
+      console.error('❌ Email service not configured');
+      return false;
+    }
+
+    const mailOptions = {
+      from: emailUser,
+      to: email,
+      subject: 'SunoCampus - Password Reset Code',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1e3a5f;">Password Reset</h2>
+          <p>Hi ${fullName || 'there'},</p>
+          <p>We received a request to reset your password. Use the code below to verify your identity:</p>
+          <div style="background: #f0f0f0; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+            <h1 style="color: #1e3a5f; letter-spacing: 3px; margin: 0;">${otp}</h1>
+          </div>
+          <p>This code expires in <strong>10 minutes</strong>.</p>
+          <p style="color: #666; font-size: 12px;">If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
+          <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;">
+          <p style="color: #999; font-size: 11px;">© 2026 SunoCampus. All rights reserved.</p>
+        </div>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`✓ Password reset OTP sent to ${email}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Password reset email error:', error.message);
+    return false;
+  }
+};
+
 export default sendOTPEmail;
