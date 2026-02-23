@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { HiOutlineShieldCheck, HiOutlineUser } from 'react-icons/hi2';
+import { HiOutlineShieldCheck, HiOutlineUser, HiOutlineSquares2X2 } from 'react-icons/hi2';
 
 export const Navbar = ({ isAuthenticated, userRole, onLogout }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -40,6 +40,11 @@ export const Navbar = ({ isAuthenticated, userRole, onLogout }) => {
                 {userRole === 'admin' && (
                   <Link to="/admin" className="text-gray-700 hover:text-red-600 font-medium transition-colors inline-flex items-center gap-1">
                     <HiOutlineShieldCheck size={18} /> Admin
+                  </Link>
+                )}
+                {(userRole === 'contributor' || userRole === 'admin') && (
+                  <Link to="/contributor" className="text-gray-700 hover:text-blue-600 font-medium transition-colors inline-flex items-center gap-1">
+                    <HiOutlineSquares2X2 size={18} /> Dashboard
                   </Link>
                 )}
                 <Link to="/profile" className="text-gray-700 hover:text-blue-600 font-medium transition-colors inline-flex items-center gap-1">
@@ -98,6 +103,11 @@ export const Navbar = ({ isAuthenticated, userRole, onLogout }) => {
                 {userRole === 'admin' && (
                   <Link to="/admin" className="flex items-center gap-1.5 py-2 text-gray-700 hover:text-red-600 transition-colors" onClick={() => setMenuOpen(false)}>
                     <HiOutlineShieldCheck size={18} /> Admin
+                  </Link>
+                )}
+                {(userRole === 'contributor' || userRole === 'admin') && (
+                  <Link to="/contributor" className="flex items-center gap-1.5 py-2 text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setMenuOpen(false)}>
+                    <HiOutlineSquares2X2 size={18} /> Dashboard
                   </Link>
                 )}
                 <Link to="/profile" className="flex items-center gap-1.5 py-2 text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setMenuOpen(false)}>

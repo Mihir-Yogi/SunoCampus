@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import Home from "./pages/Home";
 import About from "./pages/About";
@@ -6,7 +6,20 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/AdminDashboard";
+import ContributorDashboard from "./pages/ContributorDashboard";
 import { Navbar } from "./components/Navbar";
+
+// Wrapper to conditionally hide Navbar on full-page layouts
+function AppLayout({ isAuthenticated, userRole, onLogout, children }) {
+  const location = useLocation();
+  const hideNavbar = location.pathname.startsWith('/contributor');
+  return (
+    <>
+      {!hideNavbar && <Navbar isAuthenticated={isAuthenticated} userRole={userRole} onLogout={onLogout} />}
+      {children}
+    </>
+  );
+}
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -60,28 +73,33 @@ function App() {
 
   return (
     <Router>
-      <Navbar isAuthenticated={isAuthenticated} userRole={userRole} onLogout={handleLogout} />
-      <Routes>
-        <Route path="/" element={isAuthenticated ? <Navigate to="/about" /> : <Home />} />
-        <Route path="/about" element={<About />} />
-        <Route 
-          path="/login" 
-          element={isAuthenticated ? <Navigate to="/about" /> : <Login onLogin={handleLogin} />} 
-        />
-        <Route 
-          path="/register" 
-          element={isAuthenticated ? <Navigate to="/about" /> : <Register onLogin={handleLogin} />} 
-        />
-        <Route 
-          path="/profile" 
-          element={isAuthenticated ? <Profile onLogout={handleLogout} /> : <Navigate to="/login" />} 
-        />
-        <Route 
-          path="/admin" 
-          element={isAuthenticated && userRole === 'admin' ? <AdminDashboard /> : <Navigate to="/" />} 
-        />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+      <AppLayout isAuthenticated={isAuthenticated} userRole={userRole} onLogout={handleLogout}>
+        <Routes>
+          <Route path="/" element={isAuthenticated ? <Navigate to="/about" /> : <Home />} />
+          <Route path="/about" element={<About />} />
+          <Route 
+            path="/login" 
+            element={isAuthenticated ? <Navigate to="/about" /> : <Login onLogin={handleLogin} />} 
+          />
+          <Route 
+            path="/register" 
+            element={isAuthenticated ? <Navigate to="/about" /> : <Register onLogin={handleLogin} />} 
+          />
+          <Route 
+            path="/profile" 
+            element={isAuthenticated ? <Profile onLogout={handleLogout} /> : <Navigate to="/login" />} 
+          />
+          <Route 
+            path="/admin" 
+            element={isAuthenticated && userRole === 'admin' ? <AdminDashboard /> : <Navigate to="/" />} 
+          />
+          <Route 
+            path="/contributor" 
+            element={isAuthenticated && (userRole === 'contributor' || userRole === 'admin') ? <ContributorDashboard onLogout={handleLogout} /> : <Navigate to="/" />} 
+          />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </AppLayout>
     </Router>
   );
 }
