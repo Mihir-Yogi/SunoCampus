@@ -35,9 +35,19 @@ export const getFeed = async (req, res) => {
     let totalPosts = 0;
     let totalEvents = 0;
 
+    // Get blocked user IDs to exclude their content from the feed for ALL users
+    const blockedUsers = await User.find({ isBlocked: true }).select('_id').lean();
+    const blockedUserIds = blockedUsers.map(u => u._id);
+
     // --- POSTS ---
     if (type === 'all' || type === 'posts') {
       const postQuery = {};
+
+      // Always hide blocked posts and content from blocked users on Browse
+      postQuery.isBlocked = { $ne: true };
+      if (blockedUserIds.length > 0) {
+        postQuery.createdBy = { $nin: blockedUserIds };
+      }
 
       // Scope filter — admins see ALL posts regardless of scope
       if (isAdmin) {
@@ -112,6 +122,12 @@ export const getFeed = async (req, res) => {
     // --- EVENTS ---
     if (type === 'all' || type === 'events') {
       const eventQuery = {};
+
+      // Always hide blocked events and content from blocked users on Browse
+      eventQuery.isBlocked = { $ne: true };
+      if (blockedUserIds.length > 0) {
+        eventQuery.createdBy = { $nin: blockedUserIds };
+      }
 
       // Scope filter — admins see ALL events regardless of scope
       if (isAdmin) {
@@ -620,12 +636,17 @@ export const getRegistrationStatus = async (req, res) => {
 export const getPublicProfile = async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
-      .select('fullName avatar profilePicture bio college branch currentYear degreeProgram academicInterests role createdAt')
+      .select('fullName avatar profilePicture bio college branch currentYear degreeProgram academicInterests role isBlocked createdAt')
       .populate('college', 'name abbreviation')
       .lean();
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Hide blocked user profiles
+    if (user.isBlocked) {
+      return res.status(403).json({ error: 'This user has been blocked' });
     }
 
     // Count their posts and events
@@ -669,8 +690,16 @@ export const getUserPosts = async (req, res) => {
     const skip = (pageNum - 1) * limitNum;
     const userId = req.params.id;
 
-    const total = await Post.countDocuments({ createdBy: userId });
-    const posts = await Post.find({ createdBy: userId })
+    // Check if the target user is blocked — hide their posts
+    const targetUser = await User.findById(userId).select('isBlocked').lean();
+    if (targetUser?.isBlocked) {
+      return res.json({ success: true, data: { posts: [], pagination: { currentPage: 1, totalPages: 0, totalItems: 0, hasMore: false } } });
+    }
+
+    const postQuery = { createdBy: userId, isBlocked: { $ne: true } };
+
+    const total = await Post.countDocuments(postQuery);
+    const posts = await Post.find(postQuery)
       .populate('createdBy', 'fullName email avatar profilePicture')
       .populate('college', 'name abbreviation')
       .sort({ createdAt: -1 })
@@ -714,8 +743,16 @@ export const getUserEvents = async (req, res) => {
     const skip = (pageNum - 1) * limitNum;
     const userId = req.params.id;
 
-    const total = await Event.countDocuments({ createdBy: userId });
-    const events = await Event.find({ createdBy: userId })
+    // Check if the target user is blocked — hide their events
+    const targetUser = await User.findById(userId).select('isBlocked').lean();
+    if (targetUser?.isBlocked) {
+      return res.json({ success: true, data: { events: [], pagination: { currentPage: 1, totalPages: 0, totalItems: 0, hasMore: false } } });
+    }
+
+    const eventQuery = { createdBy: userId, isBlocked: { $ne: true } };
+
+    const total = await Event.countDocuments(eventQuery);
+    const events = await Event.find(eventQuery)
       .populate('createdBy', 'fullName email avatar profilePicture')
       .populate('college', 'name abbreviation')
       .sort({ createdAt: -1 })

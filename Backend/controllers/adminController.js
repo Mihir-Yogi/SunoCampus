@@ -1,6 +1,8 @@
 import User from '../models/User.js';
 import College from '../models/College.js';
 import OTP from '../models/OTP.js';
+import Post from '../models/Post.js';
+import Event from '../models/Event.js';
 
 // ==================== OVERVIEW / ANALYTICS ====================
 
@@ -17,6 +19,7 @@ export const getDashboardStats = async (req, res) => {
       totalUsers,
       activeUsers,
       deactivatedUsers,
+      blockedUsers,
       newToday,
       newThisWeek,
       newThisMonth,
@@ -30,6 +33,7 @@ export const getDashboardStats = async (req, res) => {
       User.countDocuments(),
       User.countDocuments({ isActive: true }),
       User.countDocuments({ isActive: false }),
+      User.countDocuments({ isBlocked: true }),
       User.countDocuments({ createdAt: { $gte: todayStart } }),
       User.countDocuments({ createdAt: { $gte: weekStart } }),
       User.countDocuments({ createdAt: { $gte: monthStart } }),
@@ -61,6 +65,7 @@ export const getDashboardStats = async (req, res) => {
           totalUsers,
           activeUsers,
           deactivatedUsers,
+          blockedUsers,
           newToday,
           newThisWeek,
           newThisMonth,
@@ -114,6 +119,7 @@ export const getAllUsers = async (req, res) => {
     if (role) filter.role = role;
     if (status === 'active') filter.isActive = true;
     if (status === 'inactive') filter.isActive = false;
+    if (status === 'blocked') filter.isBlocked = true;
 
     const sort = {};
     sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
@@ -687,5 +693,151 @@ export const getOTPStats = async (req, res) => {
   } catch (error) {
     console.error('OTP stats error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch OTP stats' });
+  }
+};
+
+// ==================== BLOCK / UNBLOCK ====================
+
+// PUT /api/admin/users/:id/block — Block a user (hides all their content)
+export const blockUser = async (req, res) => {
+  try {
+    if (req.params.id === req.user._id.toString()) {
+      return res.status(400).json({ success: false, error: 'Cannot block your own account' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(400).json({ success: false, error: 'Cannot block another admin' });
+    }
+
+    user.isBlocked = true;
+    await user.save();
+
+    res.json({ success: true, message: 'User blocked successfully. All their content is now hidden.' });
+  } catch (error) {
+    console.error('Block user error:', error);
+    res.status(500).json({ success: false, error: 'Failed to block user' });
+  }
+};
+
+// PUT /api/admin/users/:id/unblock — Unblock a user (restores their content visibility)
+export const unblockUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    user.isBlocked = false;
+    await user.save();
+
+    res.json({ success: true, message: 'User unblocked successfully. Their content is now visible again.' });
+  } catch (error) {
+    console.error('Unblock user error:', error);
+    res.status(500).json({ success: false, error: 'Failed to unblock user' });
+  }
+};
+
+// PUT /api/admin/posts/:id/block — Block a specific post
+export const blockPost = async (req, res) => {
+  try {
+    const post = await Post.findByIdAndUpdate(
+      req.params.id,
+      { isBlocked: true },
+      { new: true }
+    );
+    if (!post) {
+      return res.status(404).json({ success: false, error: 'Post not found' });
+    }
+    res.json({ success: true, message: 'Post blocked successfully' });
+  } catch (error) {
+    console.error('Block post error:', error);
+    res.status(500).json({ success: false, error: 'Failed to block post' });
+  }
+};
+
+// PUT /api/admin/posts/:id/unblock — Unblock a specific post
+export const unblockPost = async (req, res) => {
+  try {
+    const post = await Post.findByIdAndUpdate(
+      req.params.id,
+      { isBlocked: false },
+      { new: true }
+    );
+    if (!post) {
+      return res.status(404).json({ success: false, error: 'Post not found' });
+    }
+    res.json({ success: true, message: 'Post unblocked successfully' });
+  } catch (error) {
+    console.error('Unblock post error:', error);
+    res.status(500).json({ success: false, error: 'Failed to unblock post' });
+  }
+};
+
+// DELETE /api/admin/posts/:id — Delete a specific post
+export const deletePost = async (req, res) => {
+  try {
+    const post = await Post.findByIdAndDelete(req.params.id);
+    if (!post) {
+      return res.status(404).json({ success: false, error: 'Post not found' });
+    }
+    res.json({ success: true, message: 'Post deleted successfully' });
+  } catch (error) {
+    console.error('Delete post error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete post' });
+  }
+};
+
+// PUT /api/admin/events/:id/block — Block a specific event
+export const blockEvent = async (req, res) => {
+  try {
+    const event = await Event.findByIdAndUpdate(
+      req.params.id,
+      { isBlocked: true },
+      { new: true }
+    );
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+    res.json({ success: true, message: 'Event blocked successfully' });
+  } catch (error) {
+    console.error('Block event error:', error);
+    res.status(500).json({ success: false, error: 'Failed to block event' });
+  }
+};
+
+// PUT /api/admin/events/:id/unblock — Unblock a specific event
+export const unblockEvent = async (req, res) => {
+  try {
+    const event = await Event.findByIdAndUpdate(
+      req.params.id,
+      { isBlocked: false },
+      { new: true }
+    );
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+    res.json({ success: true, message: 'Event unblocked successfully' });
+  } catch (error) {
+    console.error('Unblock event error:', error);
+    res.status(500).json({ success: false, error: 'Failed to unblock event' });
+  }
+};
+
+// DELETE /api/admin/events/:id — Delete a specific event
+export const deleteEvent = async (req, res) => {
+  try {
+    const event = await Event.findByIdAndDelete(req.params.id);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+    res.json({ success: true, message: 'Event deleted successfully' });
+  } catch (error) {
+    console.error('Delete event error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete event' });
   }
 };

@@ -224,6 +224,27 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleBlockUser = async (userId) => {
+    if (!window.confirm('Block this user? All their posts and events will be hidden from everyone.')) return;
+    try {
+      await api.put(`/admin/users/${userId}/block`);
+      addToast('success', 'User blocked — all their content is now hidden');
+      fetchUsers();
+    } catch (err) {
+      addToast('error', err.response?.data?.error || 'Failed to block user');
+    }
+  };
+
+  const handleUnblockUser = async (userId) => {
+    try {
+      await api.put(`/admin/users/${userId}/unblock`);
+      addToast('success', 'User unblocked — their content is visible again');
+      fetchUsers();
+    } catch (err) {
+      addToast('error', err.response?.data?.error || 'Failed to unblock user');
+    }
+  };
+
   const handleApproveContributor = async (userId) => {
     try {
       await api.put(`/admin/contributors/${userId}/approve`);
@@ -373,6 +394,7 @@ const AdminDashboard = () => {
           <StatCard label="Total Colleges" value={overview.totalColleges || charts.usersByCollege.length} color="indigo" icon={<HiOutlineAcademicCap size={32} />} />
           <StatCard label="Pending Applications" value={overview.pendingApplications} color="amber" icon={<HiOutlineClock size={32} />} />
           <StatCard label="Deactivated Users" value={overview.deactivatedUsers} color="red" icon={<HiOutlineXCircle size={32} />} />
+          <StatCard label="Blocked Users" value={overview.blockedUsers || 0} color="orange" icon={<HiOutlineNoSymbol size={32} />} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -483,6 +505,7 @@ const AdminDashboard = () => {
           <option value="">All Status</option>
           <option value="active">Active</option>
           <option value="inactive">Deactivated</option>
+          <option value="blocked">Blocked</option>
         </select>
         <button
           onClick={() => setUserFilters({ search: '', role: '', status: '', page: 1 })}
@@ -542,14 +565,21 @@ const AdminDashboard = () => {
                       </select>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
-                      <button
-                        onClick={() => handleToggleStatus(user._id, !user.isActive)}
-                        className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                          user.isActive ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'
-                        } transition-colors`}
-                      >
-                        {user.isActive ? 'Active' : 'Inactive'}
-                      </button>
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => handleToggleStatus(user._id, !user.isActive)}
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                            user.isActive ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'
+                          } transition-colors`}
+                        >
+                          {user.isActive ? 'Active' : 'Inactive'}
+                        </button>
+                        {user.isBlocked && (
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 text-center">
+                            Blocked
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -560,6 +590,23 @@ const AdminDashboard = () => {
                         >
                           <HiOutlineEye size={18} />
                         </button>
+                        {user.isBlocked ? (
+                          <button
+                            onClick={() => handleUnblockUser(user._id)}
+                            className="p-1.5 text-orange-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Unblock User"
+                          >
+                            <HiOutlineNoSymbol size={18} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleBlockUser(user._id)}
+                            className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                            title="Block User"
+                          >
+                            <HiOutlineNoSymbol size={18} />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDeleteUser(user._id)}
                           className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -624,6 +671,7 @@ const AdminDashboard = () => {
                 ['Graduation', selectedUser.graduationYear || '—'],
                 ['Role', selectedUser.role],
                 ['Status', selectedUser.isActive ? 'Active' : 'Deactivated'],
+                ['Blocked', selectedUser.isBlocked ? 'Yes — all content hidden' : 'No'],
                 ['Joined', new Date(selectedUser.createdAt).toLocaleDateString()],
               ].map(([label, val]) => (
                 <div key={label} className="flex justify-between items-center py-2 border-b border-gray-100">
@@ -1428,6 +1476,8 @@ const AdminDashboard = () => {
               {[
                 { value: 'warning_issued', label: 'Warning Issued', desc: 'Send a warning to the reported user', icon: <HiOutlineExclamationTriangle size={16} /> },
                 { value: 'content_removed', label: 'Content Removed', desc: 'Offending content has been removed', icon: <HiOutlineTrash size={16} /> },
+                { value: 'content_blocked', label: 'Content Blocked', desc: 'Block the reported post/event from being visible', icon: <HiOutlineNoSymbol size={16} /> },
+                { value: 'user_blocked', label: 'User Blocked', desc: 'Block the user — hide all their posts & events', icon: <HiOutlineHandRaised size={16} /> },
                 { value: 'user_deactivated', label: 'User Deactivated', desc: 'Deactivate the reported user account', icon: <HiOutlineNoSymbol size={16} /> },
                 { value: 'user_banned', label: 'User Banned', desc: 'Permanently ban the reported user', icon: <HiOutlineHandRaised size={16} /> },
                 { value: 'no_action_needed', label: 'No Action Needed', desc: 'Report is valid but no action required', icon: <HiOutlineCheckCircle size={16} /> },

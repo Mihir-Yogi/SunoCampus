@@ -125,6 +125,10 @@ const eventSchema = new mongoose.Schema({
     ref: 'College',
     required: true,
   },
+  isBlocked: {
+    type: Boolean,
+    default: false,
+  },
 }, {
   timestamps: true,
 });
