@@ -630,7 +630,7 @@ const Browse = ({ onRoleSync }) => {
                         key={`event-${item._id}`}
                         event={item}
                         onRegister={handleRegister}
-                        onOpenEvent={() => {/* EventDetail modal — later */}}
+                        onOpenEvent={(eventId) => navigate(`/event/${eventId}`)}
                         onAuthorClick={goToProfile}
                         onReport={handleReport}
                         index={idx}

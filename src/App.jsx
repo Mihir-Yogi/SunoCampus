@@ -11,6 +11,7 @@ import ContributorDashboard from "./pages/ContributorDashboard";
 import Browse from "./pages/Browse";
 import PublicProfile from "./pages/PublicProfile";
 import ForgotPassword from "./pages/ForgotPassword";
+import EventDetails from "./pages/EventDetails";
 import { Navbar } from "./components/Navbar";
 
 // Wrapper to conditionally hide Navbar on full-page layouts
@@ -140,6 +141,10 @@ function App() {
           <Route 
             path="/user/:id" 
             element={isAuthenticated ? <PublicProfile /> : <Navigate to="/login" />} 
+          />
+          <Route 
+            path="/event/:id" 
+            element={isAuthenticated ? <EventDetails /> : <Navigate to="/login" />} 
           />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
