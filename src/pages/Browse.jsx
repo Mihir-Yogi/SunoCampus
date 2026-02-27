@@ -14,6 +14,7 @@ import EventCard from '../components/browse/EventCard';
 import PostDetail from '../components/browse/PostDetail';
 import SkeletonCard from '../components/browse/SkeletonCard';
 import ReportModal from '../components/ReportModal';
+import CustomFieldRenderer from '../components/CustomFieldRenderer';
 
 
 const Browse = ({ onRoleSync }) => {
@@ -224,11 +225,48 @@ const Browse = ({ onRoleSync }) => {
     }));
   };
 
-  // Register handler — if event has custom fields, open modal; else direct register
+  // Register handler — open modal with pre-filled data (default + custom fields)
   const handleRegister = async (event) => {
-    if (event.customFormFields && event.customFormFields.length > 0) {
+    const hasDefaultFields = event.defaultFormFields && event.defaultFormFields.length > 0;
+    const hasCustomFields = event.customFormFields && event.customFormFields.length > 0;
+
+    if (hasDefaultFields || hasCustomFields) {
+      // Pre-fill registration fields from user profile (fetch fresh data)
+      const prefilled = {};
+      
+      try {
+        const profileRes = await api.get('/profile');
+        const profile = profileRes.data?.data || {};
+        
+        // Always store college name for display (used in all registration forms)
+        prefilled._collegeName = profile.collegeName || profile.college?.name || '';
+        
+        // Fill in default fields if applicable
+        if (hasDefaultFields) {
+          const fieldMap = {
+            phone: profile.phone || '',
+            branch: profile.branch || '',
+            currentYear: profile.currentYear?.toString() || '',
+            studentId: profile.studentId || '',
+            gender: profile.gender || '',
+            dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().split('T')[0] : '',
+          };
+          event.defaultFormFields.forEach(key => {
+            prefilled[`default_${key}`] = fieldMap[key] || '';
+          });
+        }
+      } catch {
+        // If profile fetch fails, use fallback values
+        prefilled._collegeName = user?.collegeName || '';
+        if (hasDefaultFields) {
+          event.defaultFormFields.forEach(key => {
+            prefilled[`default_${key}`] = '';
+          });
+        }
+      }
+      
       setRegisteringEvent(event);
-      setFormResponses({});
+      setFormResponses(prefilled);
       setRegisterError('');
       setRegisterSuccess('');
     } else {
@@ -239,7 +277,11 @@ const Browse = ({ onRoleSync }) => {
   // Submit registration
   const submitRegistration = async (eventId, responses) => {
     try {
-      const res = await api.post(`/browse/events/${eventId}/register`, { formResponses: responses });
+      // Remove helper fields before sending
+      const cleanResponses = { ...responses };
+      delete cleanResponses._collegeName;
+
+      const res = await api.post(`/browse/events/${eventId}/register`, { formResponses: cleanResponses });
 
       // Update feed
       setFeed(prev => prev.map(item => {
@@ -281,138 +323,19 @@ const Browse = ({ onRoleSync }) => {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
-  // Custom form field renderer
+  // Custom form field renderer wrapper
   const renderFormField = (field) => {
     const value = formResponses[field.fieldId] || '';
     const onChange = (val) => setFormResponses(prev => ({ ...prev, [field.fieldId]: val }));
 
-    const commonClass = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none';
-
-    switch (field.type) {
-      case 'text':
-      case 'email':
-      case 'phone':
-      case 'url':
-        return (
-          <input
-            type={field.type === 'phone' ? 'tel' : field.type}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={field.placeholder || ''}
-            required={field.required}
-            className={commonClass}
-          />
-        );
-      case 'number':
-        return (
-          <input
-            type="number"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={field.placeholder || ''}
-            required={field.required}
-            className={commonClass}
-          />
-        );
-      case 'date':
-        return (
-          <input
-            type="date"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            required={field.required}
-            className={commonClass}
-          />
-        );
-      case 'textarea':
-        return (
-          <textarea
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={field.placeholder || ''}
-            required={field.required}
-            rows={3}
-            className={`${commonClass} resize-none`}
-          />
-        );
-      case 'dropdown':
-        return (
-          <select
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            required={field.required}
-            className={commonClass}
-          >
-            <option value="">{field.placeholder || 'Select...'}</option>
-            {(field.options || []).map(opt => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        );
-      case 'radio':
-        return (
-          <div className="space-y-1.5">
-            {(field.options || []).map(opt => (
-              <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name={field.fieldId}
-                  value={opt}
-                  checked={value === opt}
-                  onChange={() => onChange(opt)}
-                  required={field.required}
-                  className="text-blue-600 focus:ring-blue-500"
-                />
-                {opt}
-              </label>
-            ))}
-          </div>
-        );
-      case 'checkbox':
-        return (
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              checked={!!value}
-              onChange={(e) => onChange(e.target.checked)}
-              className="rounded text-blue-600 focus:ring-blue-500"
-            />
-            {field.placeholder || field.label}
-          </label>
-        );
-      case 'multi-select':
-        return (
-          <div className="space-y-1.5">
-            {(field.options || []).map(opt => (
-              <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={Array.isArray(value) && value.includes(opt)}
-                  onChange={(e) => {
-                    const arr = Array.isArray(value) ? [...value] : [];
-                    if (e.target.checked) arr.push(opt);
-                    else arr.splice(arr.indexOf(opt), 1);
-                    onChange(arr);
-                  }}
-                  className="rounded text-blue-600 focus:ring-blue-500"
-                />
-                {opt}
-              </label>
-            ))}
-          </div>
-        );
-      default:
-        return (
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={field.placeholder || ''}
-            required={field.required}
-            className={commonClass}
-          />
-        );
-    }
+    return (
+      <CustomFieldRenderer
+        field={field}
+        value={value}
+        onChange={onChange}
+        required={field.required || false}
+      />
+    );
   };
 
   // Counts for sidebar
@@ -498,7 +421,7 @@ const Browse = ({ onRoleSync }) => {
                     Liked Posts
                   </Link>
                   <Link
-                    to="/profile"
+                    to="/my-registrations"
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-all duration-200"
                   >
                     <HiOutlineClipboardDocumentCheck size={16} className="text-green-500" />
@@ -771,15 +694,94 @@ const Browse = ({ onRoleSync }) => {
             </div>
 
             <form onSubmit={handleFormSubmit} className="px-6 py-4 space-y-4">
-              {registeringEvent.customFormFields.map(field => (
-                <div key={field.fieldId}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {field.label}
-                    {field.required && <span className="text-red-500 ml-0.5">*</span>}
-                  </label>
-                  {renderFormField(field)}
+              {/* Always-shown read-only fields: Name, Email, College */}
+              <div className="space-y-3 pb-3 border-b border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Your Details</p>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Full Name</label>
+                  <input type="text" value={user?.fullName || ''} disabled className="w-full px-3 py-2 text-sm border border-gray-100 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed" />
                 </div>
-              ))}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                  <input type="text" value={user?.email || ''} disabled className="w-full px-3 py-2 text-sm border border-gray-100 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">College</label>
+                  <input type="text" value={formResponses._collegeName || user?.collegeName || ''} disabled className="w-full px-3 py-2 text-sm border border-gray-100 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed" />
+                </div>
+              </div>
+
+              {/* Contributor-selected default fields (pre-filled, editable) */}
+              {registeringEvent.defaultFormFields && registeringEvent.defaultFormFields.length > 0 && (
+                <div className="space-y-3 pb-3 border-b border-gray-100">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Additional Details</p>
+                  {registeringEvent.defaultFormFields.map(fieldKey => {
+                    const fieldConfig = {
+                      phone: { label: 'Phone Number', type: 'tel', placeholder: 'Enter phone number' },
+                      branch: { label: 'Branch', type: 'text', placeholder: 'e.g. Computer Science' },
+                      currentYear: { label: 'Current Year', type: 'select', options: ['1', '2', '3', '4'] },
+                      studentId: { label: 'Student ID', type: 'text', placeholder: 'Enter student ID' },
+                      gender: { label: 'Gender', type: 'select', options: ['male', 'female', 'other'] },
+                      dateOfBirth: { label: 'Date of Birth', type: 'date' },
+                    };
+                    const cfg = fieldConfig[fieldKey];
+                    if (!cfg) return null;
+                    const val = formResponses[`default_${fieldKey}`] || '';
+                    const onChange = (v) => setFormResponses(prev => ({ ...prev, [`default_${fieldKey}`]: v }));
+
+                    return (
+                      <div key={fieldKey}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {cfg.label} <span className="text-red-500 ml-0.5">*</span>
+                        </label>
+                        {cfg.type === 'select' ? (
+                          <select
+                            value={val}
+                            onChange={(e) => onChange(e.target.value)}
+                            required
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none capitalize"
+                          >
+                            <option value="">Select {cfg.label}...</option>
+                            {cfg.options.map(opt => (
+                              <option key={opt} value={opt} className="capitalize">{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type={cfg.type}
+                            value={val}
+                            onChange={(e) => onChange(e.target.value)}
+                            placeholder={cfg.placeholder || ''}
+                            required
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Custom form fields */}
+              {registeringEvent.customFormFields && registeringEvent.customFormFields.length > 0 && (
+                <div className="space-y-3">
+                  {registeringEvent.defaultFormFields && registeringEvent.defaultFormFields.length > 0 && (
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Event-Specific Questions</p>
+                  )}
+                  {registeringEvent.customFormFields.map(field => {
+                    // Validate field has required properties
+                    if (!field || !field.fieldId || !field.label) {
+                      console.warn('Invalid custom field:', field);
+                      return null;
+                    }
+                    return (
+                      <div key={field.fieldId}>
+                        {renderFormField(field)}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {registerError && (
                 <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{registerError}</p>

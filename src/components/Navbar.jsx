@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { HiOutlineShieldCheck, HiOutlineUser, HiOutlineSquares2X2, HiOutlineRectangleStack } from 'react-icons/hi2';
+import { HiOutlineShieldCheck, HiOutlineUser, HiOutlineSquares2X2, HiOutlineRectangleStack, HiOutlineTicket } from 'react-icons/hi2';
 
 export const Navbar = ({ isAuthenticated, userRole, onLogout }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -40,6 +40,11 @@ export const Navbar = ({ isAuthenticated, userRole, onLogout }) => {
                 <Link to="/browse" className="text-gray-700 hover:text-blue-600 font-medium transition-colors inline-flex items-center gap-1">
                   <HiOutlineRectangleStack size={18} /> Browse
                 </Link>
+                {userRole !== 'admin' && (
+                  <Link to="/my-registrations" className="text-gray-700 hover:text-blue-600 font-medium transition-colors inline-flex items-center gap-1">
+                    <HiOutlineTicket size={18} /> My Events
+                  </Link>
+                )}
                 {userRole === 'admin' && (
                   <Link to="/admin" className="text-gray-700 hover:text-red-600 font-medium transition-colors inline-flex items-center gap-1">
                     <HiOutlineShieldCheck size={18} /> Admin
@@ -108,6 +113,11 @@ export const Navbar = ({ isAuthenticated, userRole, onLogout }) => {
                 <Link to="/browse" className="flex items-center gap-1.5 py-2 text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setMenuOpen(false)}>
                   <HiOutlineRectangleStack size={18} /> Browse
                 </Link>
+                {userRole !== 'admin' && (
+                  <Link to="/my-registrations" className="flex items-center gap-1.5 py-2 text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setMenuOpen(false)}>
+                    <HiOutlineTicket size={18} /> My Events
+                  </Link>
+                )}
                 {userRole === 'admin' && (
                   <Link to="/admin" className="flex items-center gap-1.5 py-2 text-gray-700 hover:text-red-600 transition-colors" onClick={() => setMenuOpen(false)}>
                     <HiOutlineShieldCheck size={18} /> Admin

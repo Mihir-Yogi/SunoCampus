@@ -5,7 +5,6 @@ import {
   HiOutlineMagnifyingGlass,
   HiOutlineArrowDownTray,
   HiOutlineXMark,
-  HiOutlineCheck,
   HiOutlineCalendarDays,
 } from 'react-icons/hi2';
 
@@ -70,12 +69,8 @@ export default function RegistrationsTab({ showToast }) {
                     <p className="text-xs text-gray-500">Registered</p>
                   </div>
                   <div className="text-center px-3 border-l border-gray-200">
-                    <p className="font-bold text-emerald-600">{event.availableSeats}</p>
+                    <p className="font-bold text-emerald-600">{event.availableSeats != null ? event.availableSeats : '∞'}</p>
                     <p className="text-xs text-gray-500">Available</p>
-                  </div>
-                  <div className="text-center px-3 border-l border-gray-200">
-                    <p className="font-bold text-blue-600">{event.attendedCount}</p>
-                    <p className="text-xs text-gray-500">Attended</p>
                   </div>
                 </div>
               </div>
@@ -97,11 +92,6 @@ export default function RegistrationsTab({ showToast }) {
                               <p className="text-sm font-medium text-gray-800">{s.studentName}</p>
                               <p className="text-xs text-gray-500">{s.studentEmail}</p>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${s.attended ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                              {s.attended ? 'Present' : 'Absent'}
-                            </span>
                           </div>
                         </div>
                       ))}
@@ -128,14 +118,8 @@ export default function RegistrationsTab({ showToast }) {
                     {event.totalRegistered <= 3 && event.totalRegistered > 0 && (
                       <div className="flex items-center gap-2 mt-3">
                         <button
-                          onClick={() => setSelectedEvent(event._id)}
-                          className="flex-1 text-sm text-blue-600 font-medium py-2 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-center"
-                        >
-                          Manage Attendance
-                        </button>
-                        <button
                           onClick={() => setExportEvent(event._id)}
-                          className="inline-flex items-center gap-1.5 text-sm text-emerald-600 font-medium px-4 py-2 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
+                          className="inline-flex items-center gap-1.5 text-sm text-emerald-600 font-medium px-4 py-2 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors w-full justify-center"
                         >
                           <HiOutlineArrowDownTray className="w-4 h-4" />
                           CSV
@@ -176,7 +160,7 @@ function StudentListModal({ eventId, onClose, showToast }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [togglingId, setTogglingId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
 
   const fetchStudents = useCallback(async () => {
     try {
@@ -193,29 +177,6 @@ function StudentListModal({ eventId, onClose, showToast }) {
   }, [eventId, search]);
 
   useEffect(() => { fetchStudents(); }, [fetchStudents]);
-
-  const toggleAttendance = async (regId) => {
-    try {
-      setTogglingId(regId);
-      const res = await api.put(`/contributor/registrations/${regId}/attendance`);
-      if (res.data.success) {
-        setData(prev => ({
-          ...prev,
-          registrations: prev.registrations.map(r =>
-            r._id === regId ? { ...r, attended: res.data.data.attended } : r
-          ),
-          stats: {
-            ...prev.stats,
-            attendedCount: prev.stats.attendedCount + (res.data.data.attended ? 1 : -1),
-          },
-        }));
-      }
-    } catch {
-      showToast('error', 'Failed to update attendance');
-    } finally {
-      setTogglingId(null);
-    }
-  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
@@ -238,12 +199,8 @@ function StudentListModal({ eventId, onClose, showToast }) {
                 <p className="text-xs text-blue-600">Registered</p>
               </div>
               <div className="bg-emerald-50 rounded-lg px-4 py-2 text-center flex-1">
-                <p className="text-lg font-bold text-emerald-700">{data.stats.seatsAvailable}</p>
+                <p className="text-lg font-bold text-emerald-700">{data.stats.seatsAvailable != null ? data.stats.seatsAvailable : '∞'}</p>
                 <p className="text-xs text-emerald-600">Available</p>
-              </div>
-              <div className="bg-amber-50 rounded-lg px-4 py-2 text-center flex-1">
-                <p className="text-lg font-bold text-amber-700">{data.stats.attendedCount}</p>
-                <p className="text-xs text-amber-600">Attended</p>
               </div>
             </div>
           )}
@@ -269,36 +226,101 @@ function StudentListModal({ eventId, onClose, showToast }) {
             <p className="text-center text-gray-400 py-8">No students found</p>
           ) : (
             <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-              {data.registrations.map((reg) => (
-                <div key={reg._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-                      {reg.student?.fullName?.charAt(0)?.toUpperCase() || '?'}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{reg.student?.fullName}</p>
-                      <p className="text-xs text-gray-500 truncate">{reg.student?.email}</p>
-                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
-                        <span>{reg.student?.college?.name || reg.student?.collegeName}</span>
-                        <span>•</span>
-                        <span>{new Date(reg.registeredAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+              {data.registrations.map((reg) => {
+                const hasResponses = reg.formResponses && (
+                  (reg.formResponses instanceof Map ? reg.formResponses.size > 0 : Object.keys(reg.formResponses).length > 0)
+                );
+                const responses = reg.formResponses instanceof Map
+                  ? Object.fromEntries(reg.formResponses)
+                  : (reg.formResponses || {});
+                const isExpanded = expandedId === reg._id;
+
+                // Format response labels
+                const defaultLabels = {
+                  default_phone: 'Phone', default_branch: 'Branch', default_currentYear: 'Year',
+                  default_studentId: 'Student ID', default_gender: 'Gender', default_dateOfBirth: 'DOB',
+                };
+
+                return (
+                <div key={reg._id} className="bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center justify-between p-3">
+                    <div
+                      className={`flex items-center gap-3 min-w-0 flex-1 ${hasResponses ? 'cursor-pointer' : ''}`}
+                      onClick={() => hasResponses && setExpandedId(isExpanded ? null : reg._id)}
+                    >
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                        {reg.student?.fullName?.charAt(0)?.toUpperCase() || '?'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{reg.student?.fullName}</p>
+                        <p className="text-xs text-gray-500 truncate">{reg.student?.email}</p>
+                        <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                          <span>{reg.student?.college?.name || reg.student?.collegeName}</span>
+                          <span>·</span>
+                          <span>{new Date(reg.registeredAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                          {hasResponses && (
+                            <>
+                              <span>·</span>
+                              <span className="text-blue-500 font-medium">{isExpanded ? 'Hide details' : 'View details'}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => toggleAttendance(reg._id)}
-                    disabled={togglingId === reg._id}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex-shrink-0
-                      ${reg.attended
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                      } ${togglingId === reg._id ? 'opacity-50' : ''}`}
-                  >
-                    <HiOutlineCheck className="w-3.5 h-3.5" />
-                    {reg.attended ? 'Present' : 'Absent'}
-                  </button>
+
+                  {/* Expandable form responses */}
+                  {isExpanded && hasResponses && (
+                    <div className="px-3 pb-3 pt-0">
+                      <div className="bg-white rounded-lg border border-gray-200 p-3 ml-12">
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Registration Responses</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {Object.entries(responses).map(([key, val]) => {
+                            // Get pretty label
+                            let label = defaultLabels[key] || key;
+                            let fieldType = 'text';
+                            // Check custom fields
+                            if (data.event?.customFormFields) {
+                              const cf = data.event.customFormFields.find(f => f.fieldId === key);
+                              if (cf) {
+                                label = cf.label;
+                                fieldType = cf.type;
+                              }
+                            }
+                            
+                            // Handle file uploads as download links
+                            if (fieldType === 'file' && val && typeof val === 'string' && (val.startsWith('http') || val.includes('cloudinary'))) {
+                              const fileName = val.split('/').pop()?.split('?')[0] || 'Download';
+                              return (
+                                <div key={key}>
+                                  <p className="text-[10px] font-medium text-gray-400">{label}</p>
+                                  <a
+                                    href={val}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                                  >
+                                    📥 Download
+                                  </a>
+                                </div>
+                              );
+                            }
+                            
+                            const displayVal = Array.isArray(val) ? val.join(', ') : String(val);
+                            return (
+                              <div key={key}>
+                                <p className="text-[10px] font-medium text-gray-400">{label}</p>
+                                <p className="text-xs text-gray-700">{displayVal || '—'}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -9,13 +9,13 @@ import {
   createEvent,
   updateEvent,
   cancelEvent,
+  deleteEvent,
   getMyPosts,
   createPost,
   updatePost,
   deletePost,
   getEventRegistrations,
   getAllRegistrations,
-  toggleAttendance,
   exportRegistrationsCSV,
   getExportFields,
   getAnalytics,
@@ -36,6 +36,7 @@ router.get('/events/:id', getEventById);
 router.post('/events', uploadEventBanner.single('banner'), createEvent);
 router.put('/events/:id', uploadEventBanner.single('banner'), updateEvent);
 router.put('/events/:id/cancel', cancelEvent);
+router.delete('/events/:id', deleteEvent);
 
 // ── Posts CRUD ──────────────────────────────────────────────
 router.get('/posts', getMyPosts);
@@ -43,10 +44,9 @@ router.post('/posts', uploadPostImage.single('image'), createPost);
 router.put('/posts/:id', uploadPostImage.single('image'), updatePost);
 router.delete('/posts/:id', deletePost);
 
-// ── Registrations & Attendance ──────────────────────────────
+// ── Registrations ──────────────────────────────────────────
 router.get('/registrations', getAllRegistrations);
 router.get('/events/:id/registrations', getEventRegistrations);
-router.put('/registrations/:id/attendance', toggleAttendance);
 
 // ── CSV Export ──────────────────────────────────────────────
 router.get('/events/:id/export-fields', getExportFields);

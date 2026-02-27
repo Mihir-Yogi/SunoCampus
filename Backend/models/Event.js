@@ -115,6 +115,12 @@ const eventSchema = new mongoose.Schema({
     default: 'open',
   },
   customFormFields: [customFieldSchema],
+  // Default student fields the contributor wants to collect during registration
+  // Name, Email & College are ALWAYS collected. These are the optional ones.
+  defaultFormFields: [{
+    type: String,
+    enum: ['phone', 'branch', 'currentYear', 'studentId', 'gender', 'dateOfBirth'],
+  }],
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -147,7 +153,7 @@ eventSchema.virtual('availableSeats').get(function () {
 
 // Auto-set status to 'full' when seats fill up
 eventSchema.methods.checkAndUpdateStatus = function () {
-  if (this.totalSeats != null && this.registeredCount >= this.totalSeats && this.status === 'open') {
+  if (this.totalSeats != null && this.totalSeats > 0 && this.registeredCount >= this.totalSeats && this.status === 'open') {
     this.status = 'full';
   }
   return this;

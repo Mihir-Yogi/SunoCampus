@@ -49,7 +49,7 @@ const EventCard = ({ event, onRegister, onOpenEvent, onAuthorClick, onReport, in
   const deadlinePassed = event.registrationDeadline
     ? new Date(event.registrationDeadline) < new Date()
     : false;
-  const availableSeats = event.totalSeats != null ? event.totalSeats - event.registeredCount : null;
+  const availableSeats = event.totalSeats != null && event.totalSeats > 0 ? event.totalSeats - event.registeredCount : null;
   const seatsLow = availableSeats !== null && availableSeats > 0 && availableSeats <= Math.ceil(event.totalSeats * 0.2);
 
   const canRegister =
@@ -141,7 +141,7 @@ const EventCard = ({ event, onRegister, onOpenEvent, onAuthorClick, onReport, in
   };
 
   // Seats progress
-  const seatsPercentage = event.totalSeats
+  const seatsPercentage = event.totalSeats && event.totalSeats > 0
     ? Math.min(100, Math.round((event.registeredCount / event.totalSeats) * 100))
     : 0;
 
@@ -218,7 +218,7 @@ const EventCard = ({ event, onRegister, onOpenEvent, onAuthorClick, onReport, in
         </div>
 
         {/* Seats Progress */}
-        {event.totalSeats && (
+        {event.totalSeats != null && event.totalSeats > 0 && (
           <div className="mb-3" ref={progressRef}>
             <div className="flex items-center justify-between text-xs mb-1">
               <span className="text-gray-500 flex items-center gap-1">

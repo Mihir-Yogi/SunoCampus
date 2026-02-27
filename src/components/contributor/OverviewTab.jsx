@@ -116,15 +116,24 @@ export default function OverviewTab({ showToast, onNavigate }) {
                       <span>{new Date(event.eventDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
                     </div>
                     {/* Seat progress bar */}
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className={`h-2 rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {event.registeredCount}/{event.totalSeats} seats —{' '}
-                      <span className={event.availableSeats > 0 ? 'text-emerald-600 font-medium' : 'text-red-600 font-medium'}>
-                        {event.availableSeats > 0 ? `${event.availableSeats} left` : 'FULL'}
-                      </span>
-                    </p>
+                    {event.totalSeats != null && event.totalSeats > 0 ? (
+                      <>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className={`h-2 rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {event.registeredCount}/{event.totalSeats} seats —{' '}
+                          <span className={event.availableSeats > 0 ? 'text-emerald-600 font-medium' : 'text-red-600 font-medium'}>
+                            {event.availableSeats > 0 ? `${event.availableSeats} left` : 'FULL'}
+                          </span>
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {event.registeredCount} registered —{' '}
+                        <span className="text-blue-600 font-medium">Unlimited seats</span>
+                      </p>
+                    )}
                   </div>
                 );
               })}
