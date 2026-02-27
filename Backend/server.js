@@ -10,6 +10,7 @@ import adminRoutes from './routes/admin.js';
 import reportRoutes from './routes/reports.js';
 import contributorRoutes from './routes/contributor.js';
 import browseRoutes from './routes/browse.js';
+import saveRoutes from './routes/saves.js';
 import { scheduleEventReminders } from './jobs/eventReminderCron.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -52,6 +53,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/contributor', contributorRoutes);
 app.use('/api/browse', browseRoutes);
+app.use('/api/saves', saveRoutes);
 
 // Test Route
 app.get('/api/health', (req, res) => {

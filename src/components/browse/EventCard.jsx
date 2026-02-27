@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSaveContext } from '../../context/SaveContext';
 import {
   HiOutlineCalendarDays,
   HiOutlineClock,
@@ -9,6 +10,8 @@ import {
   HiOutlineCheckCircle,
   HiOutlineEllipsisVertical,
   HiOutlineFlag,
+  HiOutlineBookmark,
+  HiBookmark,
 } from 'react-icons/hi2';
 
 const CATEGORY_COLORS = {
@@ -29,13 +32,21 @@ const MODE_ICONS = {
 };
 
 const EventCard = ({ event, onRegister, onOpenEvent, onAuthorClick, onReport, index = 0 }) => {
+  const { toggleSave, isSavedItem } = useSaveContext();
   const [isRegistering, setIsRegistering] = useState(false);
   const [justRegistered, setJustRegistered] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const progressRef = useRef(null);
   const menuRef = useRef(null);
   const [progressAnimated, setProgressAnimated] = useState(false);
+
+  // Check if event is saved on mount
+  useEffect(() => {
+    setIsSaved(isSavedItem('event', event._id));
+  }, [event._id, isSavedItem]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -84,6 +95,20 @@ const EventCard = ({ event, onRegister, onOpenEvent, onAuthorClick, onReport, in
       setJustRegistered(true);
     } finally {
       setIsRegistering(false);
+    }
+  };
+
+  const handleSave = async (e) => {
+    e.stopPropagation();
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const result = await toggleSave('event', event._id);
+      setIsSaved(result);
+    } catch (error) {
+      console.error('Failed to save/unsave event:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -148,7 +173,7 @@ const EventCard = ({ event, onRegister, onOpenEvent, onAuthorClick, onReport, in
   return (
     <div
       onClick={() => onOpenEvent(event._id)}
-      className="bg-white rounded-xl border border-gray-200 hover:border-blue-200 transition-all duration-300 cursor-pointer overflow-hidden group animate-card-enter card-glow-border relative hover:-translate-y-1 hover:shadow-[0_8px_30px_-12px_rgba(59,130,246,0.15)]"
+      className="bg-white rounded-xl border border-gray-200 hover:border-blue-200 transition-all duration-300 cursor-pointer group animate-card-enter card-glow-border relative hover:-translate-y-1 hover:shadow-[0_8px_30px_-12px_rgba(59,130,246,0.15)]"
       style={{ animationDelay: `${index * 60}ms` }}
     >
       {/* Banner */}
@@ -177,6 +202,18 @@ const EventCard = ({ event, onRegister, onOpenEvent, onAuthorClick, onReport, in
         </div>
         <div className="absolute top-2 right-2 flex items-center gap-1.5">
           {getStatusBadge()}
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="p-1.5 rounded-full bg-white/90 hover:bg-white transition-all disabled:opacity-50"
+            title={isSaved ? 'Remove from saves' : 'Save event'}
+          >
+            {isSaved ? (
+              <HiBookmark size={18} className="text-amber-500" />
+            ) : (
+              <HiOutlineBookmark size={18} className="text-gray-400 hover:text-amber-500" />
+            )}
+          </button>
         </div>
 
         {/* Time urgency badge */}
@@ -252,9 +289,9 @@ const EventCard = ({ event, onRegister, onOpenEvent, onAuthorClick, onReport, in
         )}
 
         {/* Author + College */}
-        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100 mt-auto">
           <div
-            className="flex items-center gap-2 min-w-0 cursor-pointer group/author"
+            className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer group/author"
             onClick={(e) => {
               e.stopPropagation();
               if (event.createdBy?._id && onAuthorClick) onAuthorClick(event.createdBy._id);
@@ -271,38 +308,40 @@ const EventCard = ({ event, onRegister, onOpenEvent, onAuthorClick, onReport, in
                 {getInitials(event.createdBy?.fullName)}
               </div>
             )}
-            <span className="text-xs text-gray-500 truncate group-hover/author:text-blue-600 transition-colors">
-              {event.createdBy?.fullName || 'Unknown'}
-            </span>
+            <div className="min-w-0 flex-1">
+              <span className="text-xs text-gray-500 truncate block group-hover/author:text-blue-600 transition-colors">
+                {event.createdBy?.fullName || 'Unknown'}
+              </span>
+            </div>
             {event.scope === 'global' && (
               <span className="text-[10px] font-medium px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded flex-shrink-0">
                 Global
               </span>
             )}
+          </div>
 
-            {/* More menu */}
-            <div className="relative flex-shrink-0" ref={menuRef}>
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-                className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100"
-              >
-                <HiOutlineEllipsisVertical size={16} />
-              </button>
-              {showMenu && (
-                <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 z-20 animate-fadeIn">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                      if (onReport) onReport({ type: 'event', userId: event.createdBy?._id, contentId: event._id, title: event.title });
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    <HiOutlineFlag size={15} /> Report Event
-                  </button>
-                </div>
-              )}
-            </div>
+          {/* More menu */}
+          <div className="relative flex-shrink-0 z-50" ref={menuRef}>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+              className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100"
+            >
+              <HiOutlineEllipsisVertical size={16} />
+            </button>
+            {showMenu && (
+              <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 z-50 animate-fadeIn">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(false);
+                    if (onReport) onReport({ type: 'event', userId: event.createdBy?._id, contentId: event._id, title: event.title });
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <HiOutlineFlag size={15} /> Report Event
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Register Button */}

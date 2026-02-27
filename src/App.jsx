@@ -12,7 +12,10 @@ import Browse from "./pages/Browse";
 import PublicProfile from "./pages/PublicProfile";
 import ForgotPassword from "./pages/ForgotPassword";
 import MyRegistrations from "./pages/MyRegistrations";
+import EventDetails from "./pages/EventDetails";
+import SavedItems from "./pages/SavedItems";
 import { Navbar } from "./components/Navbar";
+import { SaveProvider } from "./context/SaveContext";
 
 // Wrapper to conditionally hide Navbar on full-page layouts
 function AppLayout({ isAuthenticated, userRole, onLogout, children }) {
@@ -105,9 +108,10 @@ function App() {
   }
 
   return (
-    <Router>
-      <AppLayout isAuthenticated={isAuthenticated} userRole={userRole} onLogout={handleLogout}>
-        <Routes>
+    <SaveProvider>
+      <Router>
+        <AppLayout isAuthenticated={isAuthenticated} userRole={userRole} onLogout={handleLogout}>
+          <Routes>
           <Route path="/" element={isAuthenticated ? <Navigate to="/browse" /> : <Home />} />
           <Route path="/about" element={<About />} />
           <Route 
@@ -146,10 +150,19 @@ function App() {
             path="/my-registrations" 
             element={isAuthenticated && userRole !== 'admin' ? <MyRegistrations /> : <Navigate to={isAuthenticated ? '/browse' : '/login'} />} 
           />
+          <Route 
+            path="/event/:id" 
+            element={isAuthenticated ? <EventDetails /> : <Navigate to="/login" />} 
+          />
+          <Route 
+            path="/saved-items" 
+            element={isAuthenticated && userRole !== 'admin' ? <SavedItems /> : <Navigate to={isAuthenticated ? '/browse' : '/login'} />} 
+          />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </AppLayout>
-    </Router>
+      </Router>
+    </SaveProvider>
   );
 }
 
