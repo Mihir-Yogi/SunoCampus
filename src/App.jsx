@@ -11,8 +11,8 @@ import ContributorDashboard from "./pages/ContributorDashboard";
 import Browse from "./pages/Browse";
 import PublicProfile from "./pages/PublicProfile";
 import ForgotPassword from "./pages/ForgotPassword";
-import MyRegistrations from "./pages/MyRegistrations";
 import EventDetails from "./pages/EventDetails";
+import MyRegistrations from "./pages/MyRegistrations";
 import SavedItems from "./pages/SavedItems";
 import { Navbar } from "./components/Navbar";
 import { SaveProvider } from "./context/SaveContext";
@@ -22,10 +22,10 @@ function AppLayout({ isAuthenticated, userRole, onLogout, children }) {
   const location = useLocation();
   const hideNavbar = location.pathname.startsWith('/contributor');
   return (
-    <>
+    <SaveProvider>
       {!hideNavbar && <Navbar isAuthenticated={isAuthenticated} userRole={userRole} onLogout={onLogout} />}
       {children}
-    </>
+    </SaveProvider>
   );
 }
 
@@ -108,10 +108,9 @@ function App() {
   }
 
   return (
-    <SaveProvider>
-      <Router>
-        <AppLayout isAuthenticated={isAuthenticated} userRole={userRole} onLogout={handleLogout}>
-          <Routes>
+    <Router>
+      <AppLayout isAuthenticated={isAuthenticated} userRole={userRole} onLogout={handleLogout}>
+        <Routes>
           <Route path="/" element={isAuthenticated ? <Navigate to="/browse" /> : <Home />} />
           <Route path="/about" element={<About />} />
           <Route 
@@ -147,22 +146,21 @@ function App() {
             element={isAuthenticated ? <PublicProfile /> : <Navigate to="/login" />} 
           />
           <Route 
-            path="/my-registrations" 
-            element={isAuthenticated && userRole !== 'admin' ? <MyRegistrations /> : <Navigate to={isAuthenticated ? '/browse' : '/login'} />} 
-          />
-          <Route 
             path="/event/:id" 
             element={isAuthenticated ? <EventDetails /> : <Navigate to="/login" />} 
           />
           <Route 
+            path="/my-registrations" 
+            element={isAuthenticated ? <MyRegistrations /> : <Navigate to="/login" />} 
+          />
+          <Route 
             path="/saved-items" 
-            element={isAuthenticated && userRole !== 'admin' ? <SavedItems /> : <Navigate to={isAuthenticated ? '/browse' : '/login'} />} 
+            element={isAuthenticated ? <SavedItems /> : <Navigate to="/login" />} 
           />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </AppLayout>
-      </Router>
-    </SaveProvider>
+    </Router>
   );
 }
 

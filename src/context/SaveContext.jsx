@@ -9,6 +9,8 @@ export function SaveProvider({ children }) {
 
   // Fetch all saved item IDs (no pagination limit)
   const fetchSavedCount = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return; // Skip if not authenticated
     try {
       // Get all saved IDs without limit
       const res = await api.get('/saves/all-ids');
