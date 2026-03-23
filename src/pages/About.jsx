@@ -86,6 +86,14 @@ const Reveal = ({ children, delay = 0, className = "", direction = "up" }) => {
 
 /* ───────── About Page ───────── */
 function About() {
+  // Check if user is logged in
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    setIsAuthenticated(!!token);
+  }, []);
+
   return (
     <div className="bg-gray-50 overflow-hidden">
       {/* ── Hero Section ── */}
@@ -119,10 +127,10 @@ function About() {
             <Reveal delay={360}>
               <div className="flex gap-4">
                 <Link
-                  to="/register"
+                  to={isAuthenticated ? "/browse" : "/register"}
                   className="group bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-300 hover:shadow-lg hover:shadow-blue-600/25 hover:-translate-y-0.5"
                 >
-                  Get Started
+                  {isAuthenticated ? "Go to Browse" : "Get Started"}
                   <span className="inline-block ml-1 transition-transform duration-300 group-hover:translate-x-1">&rarr;</span>
                 </Link>
                 <a
