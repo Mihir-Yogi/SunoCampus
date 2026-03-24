@@ -80,6 +80,8 @@ export default function EventFormModal({ event, onClose, showToast, viewOnly = f
 
   const [customFields, setCustomFields] = useState([]);
   const [defaultRegFields, setDefaultRegFields] = useState([]);
+  const [rules, setRules] = useState(['']);
+  const [faqs, setFaqs] = useState([]);
   const [banner, setBanner] = useState(null);
   const [bannerPreview, setBannerPreview] = useState('');
   const [saving, setSaving] = useState(false);
@@ -103,6 +105,8 @@ export default function EventFormModal({ event, onClose, showToast, viewOnly = f
       });
       setCustomFields(event.customFormFields || []);
       setDefaultRegFields(event.defaultFormFields || []);
+      setRules(event.rules && event.rules.length > 0 ? event.rules : ['']);
+      setFaqs(event.faqs && event.faqs.length > 0 ? event.faqs : []);
       if (event.bannerImage) setBannerPreview(event.bannerImage);
       // Enable optionals that have values
       setEnabledOptionals({
@@ -301,6 +305,8 @@ export default function EventFormModal({ event, onClose, showToast, viewOnly = f
 
       formData.append('customFormFields', JSON.stringify(customFields));
       formData.append('defaultFormFields', JSON.stringify(defaultRegFields));
+      formData.append('rules', JSON.stringify(rules.filter(r => r.trim())));
+      formData.append('faqs', JSON.stringify(faqs.filter(f => f.question?.trim() && f.answer?.trim())));
       if (banner) formData.append('banner', banner);
 
       let res;
@@ -739,6 +745,124 @@ export default function EventFormModal({ event, onClose, showToast, viewOnly = f
                       {/* Delete field */}
                       <button type="button" onClick={() => removeCustomField(index)}
                         className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                        <HiOutlineTrash className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Rules & Guidelines ── */}
+          <div className="border-t border-gray-200 pt-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Rules & Guidelines</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Add rules for participants to follow. Leave empty to use auto-generated defaults.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRules(prev => [...prev, ''])}
+                className="inline-flex items-center gap-1 text-sm text-blue-600 font-medium hover:text-blue-800"
+              >
+                <HiOutlinePlus className="w-4 h-4" />
+                Add Rule
+              </button>
+            </div>
+            <div className="space-y-2">
+              {rules.map((rule, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] font-bold text-blue-600">{index + 1}</span>
+                  </span>
+                  <input
+                    type="text"
+                    value={rule}
+                    onChange={(e) => {
+                      const updated = [...rules];
+                      updated[index] = e.target.value;
+                      setRules(updated);
+                    }}
+                    placeholder={`Rule ${index + 1}`}
+                    maxLength={500}
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  {rules.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setRules(prev => prev.filter((_, i) => i !== index))}
+                      className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                    >
+                      <HiOutlineTrash className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── FAQs ── */}
+          <div className="border-t border-gray-200 pt-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Frequently Asked Questions</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Add FAQs for your event. Leave empty to use auto-generated defaults.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFaqs(prev => [...prev, { question: '', answer: '' }])}
+                className="inline-flex items-center gap-1 text-sm text-blue-600 font-medium hover:text-blue-800"
+              >
+                <HiOutlinePlus className="w-4 h-4" />
+                Add FAQ
+              </button>
+            </div>
+            {faqs.length === 0 ? (
+              <div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                <p className="text-sm text-gray-400">No custom FAQs added</p>
+                <p className="text-xs text-gray-400 mt-1">Auto-generated FAQs will be shown based on event settings</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {faqs.map((faq, index) => (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 space-y-2">
+                        <input
+                          type="text"
+                          value={faq.question}
+                          onChange={(e) => {
+                            const updated = [...faqs];
+                            updated[index] = { ...updated[index], question: e.target.value };
+                            setFaqs(updated);
+                          }}
+                          placeholder="Question"
+                          maxLength={300}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        <textarea
+                          value={faq.answer}
+                          onChange={(e) => {
+                            const updated = [...faqs];
+                            updated[index] = { ...updated[index], answer: e.target.value };
+                            setFaqs(updated);
+                          }}
+                          placeholder="Answer"
+                          maxLength={1000}
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFaqs(prev => prev.filter((_, i) => i !== index))}
+                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                      >
                         <HiOutlineTrash className="w-4 h-4" />
                       </button>
                     </div>

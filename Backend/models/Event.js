@@ -115,6 +115,25 @@ const eventSchema = new mongoose.Schema({
     default: 'open',
   },
   customFormFields: [customFieldSchema],
+  rules: [{
+    type: String,
+    trim: true,
+    maxlength: [500, 'Each rule cannot exceed 500 characters'],
+  }],
+  faqs: [{
+    question: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [300, 'FAQ question cannot exceed 300 characters'],
+    },
+    answer: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [1000, 'FAQ answer cannot exceed 1000 characters'],
+    },
+  }],
   // Default student fields the contributor wants to collect during registration
   // Name, Email & College are ALWAYS collected. These are the optional ones.
   defaultFormFields: [{

@@ -156,6 +156,7 @@ export const createEvent = async (req, res) => {
       eventDate, eventTime, totalSeats,
       location, zoomLink, scope, customFormFields,
       registrationDeadline, defaultFormFields,
+      rules, faqs,
     } = req.body;
 
     // Validate required fields
@@ -244,6 +245,12 @@ export const createEvent = async (req, res) => {
       defaultFormFields: defaultFormFields
         ? (typeof defaultFormFields === 'string' ? JSON.parse(defaultFormFields) : defaultFormFields)
         : [],
+      rules: rules
+        ? (typeof rules === 'string' ? JSON.parse(rules) : rules).filter(r => r && r.trim())
+        : [],
+      faqs: faqs
+        ? (typeof faqs === 'string' ? JSON.parse(faqs) : faqs).filter(f => f && f.question && f.question.trim() && f.answer && f.answer.trim())
+        : [],
       createdBy: req.user._id,
       college: req.user.college,
     };
@@ -295,6 +302,7 @@ export const updateEvent = async (req, res) => {
       eventDate, eventTime, totalSeats,
       location, zoomLink, scope, customFormFields,
       registrationDeadline, defaultFormFields,
+      rules, faqs,
     } = req.body;
 
     // Cannot reduce total seats below current registrations
@@ -377,6 +385,18 @@ export const updateEvent = async (req, res) => {
         ? JSON.parse(defaultFormFields)
         : defaultFormFields;
       event.defaultFormFields = parsed || [];
+    }
+
+    // Update rules
+    if (rules !== undefined) {
+      const parsed = typeof rules === 'string' ? JSON.parse(rules) : rules;
+      event.rules = (parsed || []).filter(r => r && r.trim());
+    }
+
+    // Update FAQs
+    if (faqs !== undefined) {
+      const parsed = typeof faqs === 'string' ? JSON.parse(faqs) : faqs;
+      event.faqs = (parsed || []).filter(f => f && f.question && f.question.trim() && f.answer && f.answer.trim());
     }
 
     // Handle banner image update

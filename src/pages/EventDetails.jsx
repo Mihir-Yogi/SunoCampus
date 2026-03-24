@@ -307,33 +307,42 @@ const EventDetails = () => {
     }
   };
 
-  // ─── FAQ Data (generated from event) ──────────────────────────────────────
-  const faqItems = [];
+  // ─── FAQ Data (from event or auto-generated) ──────────────────────────────
+  let faqItems = [];
   if (event) {
-    if (event.mode === 'Online' || event.mode === 'Hybrid') {
-      faqItems.push({ q: 'How do I join the event online?', a: event.zoomLink ? 'A meeting link will be shared with registered participants before the event. Check your email for the link.' : 'The meeting link will be shared with registered participants before the event via email.' });
+    if (event.faqs && event.faqs.length > 0) {
+      faqItems = event.faqs.map(f => ({ q: f.question, a: f.answer }));
+    } else {
+      if (event.mode === 'Online' || event.mode === 'Hybrid') {
+        faqItems.push({ q: 'How do I join the event online?', a: event.zoomLink ? 'A meeting link will be shared with registered participants before the event. Check your email for the link.' : 'The meeting link will be shared with registered participants before the event via email.' });
+      }
+      if (event.totalSeats) {
+        faqItems.push({ q: 'What happens if seats are full?', a: 'Once all seats are filled, registration will be closed automatically. We recommend registering early to secure your spot.' });
+      }
+      if (event.registrationDeadline) {
+        faqItems.push({ q: 'Can I register after the deadline?', a: `No, registration closes on ${formatShortDate(event.registrationDeadline)}. Make sure to register before the deadline.` });
+      }
+      faqItems.push({ q: 'Will I receive a confirmation?', a: 'Yes, you will receive a confirmation email once you successfully register for the event.' });
+      faqItems.push({ q: 'Can I cancel my registration?', a: 'Currently, registration cancellation is not available. Please make sure before registering.' });
     }
-    if (event.totalSeats) {
-      faqItems.push({ q: 'What happens if seats are full?', a: 'Once all seats are filled, registration will be closed automatically. We recommend registering early to secure your spot.' });
-    }
-    if (event.registrationDeadline) {
-      faqItems.push({ q: 'Can I register after the deadline?', a: `No, registration closes on ${formatShortDate(event.registrationDeadline)}. Make sure to register before the deadline.` });
-    }
-    faqItems.push({ q: 'Will I receive a confirmation?', a: 'Yes, you will receive a confirmation email once you successfully register for the event.' });
-    faqItems.push({ q: 'Can I cancel my registration?', a: 'Currently, registration cancellation is not available. Please make sure before registering.' });
   }
 
-  // ─── Rules & Guidelines ───────────────────────────────────────────────────
-  const guidelines = [
-    'Be on time for the event',
-    event?.mode !== 'Online' && 'Carry your college ID card',
-    'Follow the code of conduct',
-    event?.mode === 'Online' && 'Ensure stable internet connection',
-    event?.mode === 'Online' && 'Keep your camera on during the session',
-    'Be respectful to speakers and other participants',
-    event?.totalSeats && 'Registered seats are non-transferable',
-    'Contact the organizer for any queries',
-  ].filter(Boolean);
+  // ─── Rules & Guidelines (from event or auto-generated) ────────────────────
+  let guidelines;
+  if (event?.rules && event.rules.length > 0) {
+    guidelines = event.rules;
+  } else {
+    guidelines = [
+      'Be on time for the event',
+      event?.mode !== 'Online' && 'Carry your college ID card',
+      'Follow the code of conduct',
+      event?.mode === 'Online' && 'Ensure stable internet connection',
+      event?.mode === 'Online' && 'Keep your camera on during the session',
+      'Be respectful to speakers and other participants',
+      event?.totalSeats && 'Registered seats are non-transferable',
+      'Contact the organizer for any queries',
+    ].filter(Boolean);
+  }
 
   // ─── Loading skeleton ────────────────────────────────────────────────────
   if (loading) {
