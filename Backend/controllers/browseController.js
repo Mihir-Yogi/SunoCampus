@@ -35,9 +35,19 @@ export const getFeed = async (req, res) => {
     let totalPosts = 0;
     let totalEvents = 0;
 
+    // Get blocked user IDs to exclude their content from the feed for ALL users
+    const blockedUsers = await User.find({ isBlocked: true }).select('_id').lean();
+    const blockedUserIds = blockedUsers.map(u => u._id);
+
     // --- POSTS ---
     if (type === 'all' || type === 'posts') {
       const postQuery = {};
+
+      // Always hide blocked posts and content from blocked users on Browse
+      postQuery.isBlocked = { $ne: true };
+      if (blockedUserIds.length > 0) {
+        postQuery.createdBy = { $nin: blockedUserIds };
+      }
 
       // Scope filter — admins see ALL posts regardless of scope
       if (isAdmin) {
@@ -112,6 +122,12 @@ export const getFeed = async (req, res) => {
     // --- EVENTS ---
     if (type === 'all' || type === 'events') {
       const eventQuery = {};
+
+      // Always hide blocked events and content from blocked users on Browse
+      eventQuery.isBlocked = { $ne: true };
+      if (blockedUserIds.length > 0) {
+        eventQuery.createdBy = { $nin: blockedUserIds };
+      }
 
       // Scope filter — admins see ALL events regardless of scope
       if (isAdmin) {
@@ -515,7 +531,7 @@ export const registerForEvent = async (req, res) => {
       return res.status(400).json({ error: 'Registration deadline has passed' });
     }
 
-    if (event.totalSeats != null && event.registeredCount >= event.totalSeats) {
+    if (event.totalSeats != null && event.totalSeats > 0 && event.registeredCount >= event.totalSeats) {
       return res.status(400).json({ error: 'No seats available' });
     }
 
@@ -525,15 +541,112 @@ export const registerForEvent = async (req, res) => {
       return res.status(400).json({ error: 'You are already registered for this event' });
     }
 
+    // Validate default registration fields
+    if (event.defaultFormFields && event.defaultFormFields.length > 0) {
+      for (const fieldKey of event.defaultFormFields) {
+        const value = formResponses[`default_${fieldKey}`];
+        if (value === undefined || value === null || value === '') {
+          const labelMap = {
+            phone: 'Phone Number', branch: 'Branch', currentYear: 'Current Year',
+            studentId: 'Student ID', gender: 'Gender', dateOfBirth: 'Date of Birth',
+          };
+          return res.status(400).json({
+            error: `"${labelMap[fieldKey] || fieldKey}" is required`,
+          });
+        }
+      }
+    }
+
     // Validate custom form fields
     if (event.customFormFields && event.customFormFields.length > 0) {
       for (const field of event.customFormFields) {
+        const value = formResponses[field.fieldId];
+        
+        // Check required fields
         if (field.required) {
-          const value = formResponses[field.fieldId];
-          if (value === undefined || value === null || value === '') {
+          if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
             return res.status(400).json({
               error: `"${field.label}" is required`,
             });
+          }
+        }
+
+        // Validate field types
+        if (value !== undefined && value !== null && value !== '' && value.length > 0) {
+          switch (field.type) {
+            case 'number':
+              if (isNaN(Number(value))) {
+                return res.status(400).json({
+                  error: `"${field.label}" must be a valid number`,
+                });
+              }
+              break;
+
+            case 'email':
+              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+              if (!emailRegex.test(value)) {
+                return res.status(400).json({
+                  error: `"${field.label}" must be a valid email address`,
+                });
+              }
+              break;
+
+            case 'phone':
+              // Basic phone validation - at least 9 digits
+              const phoneRegex = /\d/g;
+              const digits = (value.match(phoneRegex) || []).length;
+              if (digits < 9) {
+                return res.status(400).json({
+                  error: `"${field.label}" must be a valid phone number`,
+                });
+              }
+              break;
+
+            case 'url':
+              try {
+                new URL(value);
+              } catch {
+                return res.status(400).json({
+                  error: `"${field.label}" must be a valid URL`,
+                });
+              }
+              break;
+
+            case 'date':
+              if (isNaN(Date.parse(value))) {
+                return res.status(400).json({
+                  error: `"${field.label}" must be a valid date`,
+                });
+              }
+              break;
+
+            case 'dropdown':
+            case 'radio':
+              if (!Array.isArray(field.options) || !field.options.includes(value)) {
+                return res.status(400).json({
+                  error: `"${field.label}" contains an invalid selection`,
+                });
+              }
+              break;
+
+            case 'multi-select':
+              if (!Array.isArray(value)) {
+                return res.status(400).json({
+                  error: `"${field.label}" must be an array of selections`,
+                });
+              }
+              if (Array.isArray(field.options)) {
+                const invalidOptions = value.filter(v => !field.options.includes(v));
+                if (invalidOptions.length > 0) {
+                  return res.status(400).json({
+                    error: `"${field.label}" contains invalid selections`,
+                  });
+                }
+              }
+              break;
+
+            default:
+              break;
           }
         }
       }
@@ -620,12 +733,17 @@ export const getRegistrationStatus = async (req, res) => {
 export const getPublicProfile = async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
-      .select('fullName avatar profilePicture bio college branch currentYear degreeProgram academicInterests role createdAt')
+      .select('fullName avatar profilePicture bio college branch currentYear degreeProgram academicInterests role isBlocked createdAt')
       .populate('college', 'name abbreviation')
       .lean();
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Hide blocked user profiles
+    if (user.isBlocked) {
+      return res.status(403).json({ error: 'This user has been blocked' });
     }
 
     // Count their posts and events
@@ -669,8 +787,16 @@ export const getUserPosts = async (req, res) => {
     const skip = (pageNum - 1) * limitNum;
     const userId = req.params.id;
 
-    const total = await Post.countDocuments({ createdBy: userId });
-    const posts = await Post.find({ createdBy: userId })
+    // Check if the target user is blocked — hide their posts
+    const targetUser = await User.findById(userId).select('isBlocked').lean();
+    if (targetUser?.isBlocked) {
+      return res.json({ success: true, data: { posts: [], pagination: { currentPage: 1, totalPages: 0, totalItems: 0, hasMore: false } } });
+    }
+
+    const postQuery = { createdBy: userId, isBlocked: { $ne: true } };
+
+    const total = await Post.countDocuments(postQuery);
+    const posts = await Post.find(postQuery)
       .populate('createdBy', 'fullName email avatar profilePicture')
       .populate('college', 'name abbreviation')
       .sort({ createdAt: -1 })
@@ -714,8 +840,16 @@ export const getUserEvents = async (req, res) => {
     const skip = (pageNum - 1) * limitNum;
     const userId = req.params.id;
 
-    const total = await Event.countDocuments({ createdBy: userId });
-    const events = await Event.find({ createdBy: userId })
+    // Check if the target user is blocked — hide their events
+    const targetUser = await User.findById(userId).select('isBlocked').lean();
+    if (targetUser?.isBlocked) {
+      return res.json({ success: true, data: { events: [], pagination: { currentPage: 1, totalPages: 0, totalItems: 0, hasMore: false } } });
+    }
+
+    const eventQuery = { createdBy: userId, isBlocked: { $ne: true } };
+
+    const total = await Event.countDocuments(eventQuery);
+    const events = await Event.find(eventQuery)
       .populate('createdBy', 'fullName email avatar profilePicture')
       .populate('college', 'name abbreviation')
       .sort({ createdAt: -1 })
@@ -745,5 +879,107 @@ export const getUserEvents = async (req, res) => {
   } catch (error) {
     console.error('Get user events error:', error);
     res.status(500).json({ error: 'Failed to fetch user events' });
+  }
+};
+
+// ============================================================
+// GET MY REGISTRATIONS — Student's registered events
+// ============================================================
+export const getMyRegistrations = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const registrations = await Registration.find({ student: userId })
+      .populate({
+        path: 'event',
+        populate: [
+          { path: 'createdBy', select: 'fullName avatar profilePicture' },
+          { path: 'college', select: 'name abbreviation' },
+        ],
+      })
+      .sort({ registeredAt: -1 })
+      .lean();
+
+    // Filter out registrations where event was deleted or blocked
+    const filtered = registrations.filter(r => r.event && !r.event.isBlocked);
+
+    const now = new Date();
+    const data = filtered.map(r => ({
+      _id: r._id,
+      registeredAt: r.registeredAt,
+      attended: r.attended,
+      formResponses: r.formResponses,
+      event: {
+        _id: r.event._id,
+        title: r.event.title,
+        description: r.event.description,
+        category: r.event.category,
+        mode: r.event.mode,
+        eventDate: r.event.eventDate,
+        eventTime: r.event.eventTime,
+        location: r.event.location,
+        zoomLink: r.event.zoomLink,
+        bannerImage: r.event.bannerImage,
+        status: r.event.status,
+        registeredCount: r.event.registeredCount,
+        totalSeats: r.event.totalSeats,
+        createdBy: r.event.createdBy,
+        college: r.event.college,
+        isPast: new Date(r.event.eventDate) < now,
+      },
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        registrations: data,
+        total: data.length,
+        upcoming: data.filter(r => !r.event.isPast).length,
+        past: data.filter(r => r.event.isPast).length,
+      },
+    });
+  } catch (error) {
+    console.error('Get my registrations error:', error);
+    res.status(500).json({ error: 'Failed to fetch registrations' });
+  }
+};
+
+// ============================================================
+// CANCEL REGISTRATION — Student cancels their registration
+// ============================================================
+export const cancelRegistration = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const registrationId = req.params.id;
+
+    const registration = await Registration.findOne({
+      _id: registrationId,
+      student: userId,
+    }).populate('event');
+
+    if (!registration) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+
+    // Cannot cancel if event already passed
+    if (new Date(registration.event.eventDate) < new Date()) {
+      return res.status(400).json({ error: 'Cannot cancel registration for a past event' });
+    }
+
+    // Decrement registered count
+    await Event.findByIdAndUpdate(registration.event._id, {
+      $inc: { registeredCount: -1 },
+      ...(registration.event.status === 'full' ? { status: 'open' } : {}),
+    });
+
+    await Registration.findByIdAndDelete(registrationId);
+
+    res.json({
+      success: true,
+      message: 'Registration cancelled successfully',
+    });
+  } catch (error) {
+    console.error('Cancel registration error:', error);
+    res.status(500).json({ error: 'Failed to cancel registration' });
   }
 };

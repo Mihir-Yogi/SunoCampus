@@ -81,6 +81,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  isBlocked: {
+    type: Boolean,
+    default: false,
+  },
 
   // Profile
   googleId: String,

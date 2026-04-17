@@ -10,6 +10,7 @@ import adminRoutes from './routes/admin.js';
 import reportRoutes from './routes/reports.js';
 import contributorRoutes from './routes/contributor.js';
 import browseRoutes from './routes/browse.js';
+import saveRoutes from './routes/saves.js';
 import { scheduleEventReminders } from './jobs/eventReminderCron.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,10 +18,10 @@ const __dirname = path.dirname(__filename);
 
 console.log('\n🔧 Configuration Check:');
 console.log(`  NODE_ENV: ${process.env.NODE_ENV}`);
-console.log(`  MONGODB_URI: ${process.env.MONGODB_URI ? '✓ Configured' : '✗ Missing'}`);
-console.log(`  EMAIL_USER: ${process.env.EMAIL_USER ? '✓ Configured' : '✗ Missing'}`);
-console.log(`  EMAIL_PASS: ${process.env.EMAIL_PASS ? '✓ Configured' : '✗ Missing'}`);
-console.log(`  CLOUDINARY:  ${process.env.CLOUDINARY_CLOUD_NAME ? '✓ Configured' : '✗ Missing'}\n`);
+console.log(`  MONGODB_URI: ${process.env.MONGODB_URI ? ' Configured' : ' Missing'}`);
+console.log(`  EMAIL_USER: ${process.env.EMAIL_USER ? ' Configured' : ' Missing'}`);
+console.log(`  EMAIL_PASS: ${process.env.EMAIL_PASS ? ' Configured' : ' Missing'}`);
+console.log(`  CLOUDINARY:  ${process.env.CLOUDINARY_CLOUD_NAME ? ' Configured' : ' Missing'}\n`);
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/contributor', contributorRoutes);
 app.use('/api/browse', browseRoutes);
+app.use('/api/saves', saveRoutes);
 
 // Test Route
 app.get('/api/health', (req, res) => {

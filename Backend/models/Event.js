@@ -115,6 +115,31 @@ const eventSchema = new mongoose.Schema({
     default: 'open',
   },
   customFormFields: [customFieldSchema],
+  rules: [{
+    type: String,
+    trim: true,
+    maxlength: [500, 'Each rule cannot exceed 500 characters'],
+  }],
+  faqs: [{
+    question: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [300, 'FAQ question cannot exceed 300 characters'],
+    },
+    answer: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [1000, 'FAQ answer cannot exceed 1000 characters'],
+    },
+  }],
+  // Default student fields the contributor wants to collect during registration
+  // Name, Email & College are ALWAYS collected. These are the optional ones.
+  defaultFormFields: [{
+    type: String,
+    enum: ['phone', 'branch', 'currentYear', 'studentId', 'gender', 'dateOfBirth'],
+  }],
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -124,6 +149,10 @@ const eventSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'College',
     required: true,
+  },
+  isBlocked: {
+    type: Boolean,
+    default: false,
   },
 }, {
   timestamps: true,
@@ -143,7 +172,7 @@ eventSchema.virtual('availableSeats').get(function () {
 
 // Auto-set status to 'full' when seats fill up
 eventSchema.methods.checkAndUpdateStatus = function () {
-  if (this.totalSeats != null && this.registeredCount >= this.totalSeats && this.status === 'open') {
+  if (this.totalSeats != null && this.totalSeats > 0 && this.registeredCount >= this.totalSeats && this.status === 'open') {
     this.status = 'full';
   }
   return this;

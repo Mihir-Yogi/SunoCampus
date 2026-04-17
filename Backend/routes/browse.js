@@ -13,6 +13,8 @@ import {
   getPublicProfile,
   getUserPosts,
   getUserEvents,
+  getMyRegistrations,
+  cancelRegistration,
 } from '../controllers/browseController.js';
 
 const router = express.Router();
@@ -34,6 +36,10 @@ router.delete('/comments/:commentId', deleteComment);
 router.get('/events/:id', getEvent);
 router.post('/events/:id/register', registerForEvent);
 router.get('/events/:id/registration-status', getRegistrationStatus);
+
+// My Registrations
+router.get('/my-registrations', getMyRegistrations);
+router.delete('/registrations/:id', cancelRegistration);
 
 // Public user profile
 router.get('/users/:id', getPublicProfile);

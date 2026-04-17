@@ -259,6 +259,11 @@ export const login = async (req, res) => {
       return res.status(403).json({ error: 'Account has been deactivated' });
     }
 
+    // Check if account is blocked
+    if (user.isBlocked) {
+      return res.status(403).json({ error: 'Your account has been blocked by an administrator' });
+    }
+
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
 

@@ -1,12 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
-import { HiOutlineHeart, HiHeart, HiOutlineChatBubbleOvalLeft, HiOutlineEllipsisVertical, HiOutlineFlag } from 'react-icons/hi2';
+import { useSaveContext } from '../../context/SaveContext';
+import { HiOutlineHeart, HiHeart, HiOutlineChatBubbleOvalLeft, HiOutlineEllipsisVertical, HiOutlineFlag, HiOutlineBookmark, HiBookmark } from 'react-icons/hi2';
 
 const PostCard = ({ post, onLike, onOpenPost, onAuthorClick, onReport, index = 0 }) => {
+  const { toggleSave, isSavedItem } = useSaveContext();
   const [isLiking, setIsLiking] = useState(false);
   const [justLiked, setJustLiked] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const heartRef = useRef(null);
   const menuRef = useRef(null);
+
+  // Check if post is saved on mount
+  useEffect(() => {
+    setIsSaved(isSavedItem('post', post._id));
+  }, [post._id, isSavedItem]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -26,6 +35,20 @@ const PostCard = ({ post, onLike, onOpenPost, onAuthorClick, onReport, index = 0
     } finally {
       setIsLiking(false);
       setTimeout(() => setJustLiked(false), 400);
+    }
+  };
+
+  const handleSave = async (e) => {
+    e.stopPropagation();
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const result = await toggleSave('post', post._id);
+      setIsSaved(result);
+    } catch (error) {
+      console.error('Failed to save/unsave post:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -59,7 +82,7 @@ const PostCard = ({ post, onLike, onOpenPost, onAuthorClick, onReport, index = 0
   return (
     <div
       onClick={() => onOpenPost(post._id)}
-      className="bg-white rounded-xl border border-gray-200 hover:border-blue-200 hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden group animate-card-enter hover:-translate-y-1"
+      className="bg-white rounded-xl border border-gray-200 hover:border-blue-200 hover:shadow-lg transition-all duration-300 cursor-pointer group animate-card-enter hover:-translate-y-1"
       style={{ animationDelay: `${index * 60}ms` }}
     >
       {/* Post Image */}
@@ -111,7 +134,7 @@ const PostCard = ({ post, onLike, onOpenPost, onAuthorClick, onReport, index = 0
           )}
 
           {/* More menu */}
-          <div className="relative ml-auto flex-shrink-0" ref={menuRef}>
+          <div className="relative ml-auto flex-shrink-0 z-50" ref={menuRef}>
             <button
               onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
               className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100"
@@ -119,7 +142,7 @@ const PostCard = ({ post, onLike, onOpenPost, onAuthorClick, onReport, index = 0
               <HiOutlineEllipsisVertical size={16} />
             </button>
             {showMenu && (
-              <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 z-20 animate-fadeIn">
+              <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 z-50 animate-fadeIn">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -166,6 +189,19 @@ const PostCard = ({ post, onLike, onOpenPost, onAuthorClick, onReport, index = 0
             <HiOutlineChatBubbleOvalLeft size={18} />
             <span className="font-medium">{post.commentsCount || 0}</span>
           </div>
+
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className={`ml-auto flex items-center gap-1.5 text-sm transition-all duration-200 ${
+              isSaved
+                ? 'text-amber-500 hover:text-amber-600'
+                : 'text-gray-400 hover:text-amber-500'
+            } ${isSaving ? 'opacity-50' : ''}`}
+            title={isSaved ? 'Remove from saves' : 'Save post'}
+          >
+            {isSaved ? <HiBookmark size={18} /> : <HiOutlineBookmark size={18} />}
+          </button>
         </div>
       </div>
     </div>

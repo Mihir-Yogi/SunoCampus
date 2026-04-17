@@ -49,7 +49,7 @@ export const getOverview = async (req, res) => {
       eventDate: e.eventDate,
       totalSeats: e.totalSeats,
       registeredCount: e.registeredCount,
-      availableSeats: e.totalSeats != null ? e.totalSeats - e.registeredCount : null,
+      availableSeats: e.totalSeats != null && e.totalSeats > 0 ? e.totalSeats - e.registeredCount : null,
     }));
 
     // Recent posts (top 5)
@@ -107,7 +107,7 @@ export const getMyEvents = async (req, res) => {
     // Add availableSeats virtual
     const eventsWithSeats = events.map(e => ({
       ...e,
-      availableSeats: e.totalSeats != null ? e.totalSeats - e.registeredCount : null,
+      availableSeats: e.totalSeats != null && e.totalSeats > 0 ? e.totalSeats - e.registeredCount : null,
     }));
 
     res.json({ success: true, data: eventsWithSeats });
@@ -136,7 +136,7 @@ export const getEventById = async (req, res) => {
       success: true,
       data: {
         ...event,
-        availableSeats: event.totalSeats != null ? event.totalSeats - event.registeredCount : null,
+        availableSeats: event.totalSeats != null && event.totalSeats > 0 ? event.totalSeats - event.registeredCount : null,
       },
     });
   } catch (error) {
@@ -155,7 +155,8 @@ export const createEvent = async (req, res) => {
       title, description, category, mode,
       eventDate, eventTime, totalSeats,
       location, zoomLink, scope, customFormFields,
-      registrationDeadline,
+      registrationDeadline, defaultFormFields,
+      rules, faqs,
     } = req.body;
 
     // Validate required fields
@@ -195,12 +196,25 @@ export const createEvent = async (req, res) => {
         ? JSON.parse(customFormFields)
         : customFormFields;
 
+      // Valid field types
+      const validFieldTypes = [
+        'text', 'number', 'dropdown', 'multi-select', 'checkbox',
+        'radio', 'textarea', 'date', 'email', 'phone', 'url', 'file'
+      ];
+
       // Validate custom fields structure
       for (const field of parsedCustomFields) {
         if (!field.fieldId || !field.label || !field.type) {
           return res.status(400).json({
             success: false,
             message: 'Each custom field must have fieldId, label, and type',
+          });
+        }
+        // Validate field type is valid
+        if (!validFieldTypes.includes(field.type)) {
+          return res.status(400).json({
+            success: false,
+            message: `Field type "${field.type}" is not valid`,
           });
         }
         // Validate options for dropdown/radio/multi-select
@@ -222,12 +236,21 @@ export const createEvent = async (req, res) => {
       mode,
       eventDate: new Date(eventDate),
       eventTime: eventTime.trim(),
-      totalSeats: totalSeats ? parseInt(totalSeats) : null,
+      totalSeats: totalSeats && parseInt(totalSeats) > 0 ? parseInt(totalSeats) : null,
       registrationDeadline: registrationDeadline ? new Date(registrationDeadline) : null,
       location: location?.trim() || '',
       zoomLink: zoomLink?.trim() || '',
       scope: scope || 'campus',
       customFormFields: parsedCustomFields,
+      defaultFormFields: defaultFormFields
+        ? (typeof defaultFormFields === 'string' ? JSON.parse(defaultFormFields) : defaultFormFields)
+        : [],
+      rules: rules
+        ? (typeof rules === 'string' ? JSON.parse(rules) : rules).filter(r => r && r.trim())
+        : [],
+      faqs: faqs
+        ? (typeof faqs === 'string' ? JSON.parse(faqs) : faqs).filter(f => f && f.question && f.question.trim() && f.answer && f.answer.trim())
+        : [],
       createdBy: req.user._id,
       college: req.user.college,
     };
@@ -278,7 +301,8 @@ export const updateEvent = async (req, res) => {
       title, description, category, mode,
       eventDate, eventTime, totalSeats,
       location, zoomLink, scope, customFormFields,
-      registrationDeadline,
+      registrationDeadline, defaultFormFields,
+      rules, faqs,
     } = req.body;
 
     // Cannot reduce total seats below current registrations
@@ -296,7 +320,7 @@ export const updateEvent = async (req, res) => {
     if (mode) event.mode = mode;
     if (eventDate) event.eventDate = new Date(eventDate);
     if (eventTime) event.eventTime = eventTime.trim();
-    if (totalSeats) {
+    if (totalSeats && parseInt(totalSeats) > 0) {
       event.totalSeats = parseInt(totalSeats);
       // Re-evaluate status when seats change
       if (event.registeredCount >= event.totalSeats) {
@@ -304,8 +328,8 @@ export const updateEvent = async (req, res) => {
       } else if (event.status === 'full') {
         event.status = 'open';
       }
-    } else if (totalSeats === '' || totalSeats === null) {
-      // Explicitly cleared — unlimited
+    } else if (totalSeats !== undefined) {
+      // Explicitly cleared or set to 0 — unlimited
       event.totalSeats = null;
       if (event.status === 'full') event.status = 'open';
     }
@@ -321,7 +345,58 @@ export const updateEvent = async (req, res) => {
       const parsed = typeof customFormFields === 'string'
         ? JSON.parse(customFormFields)
         : customFormFields;
+
+      // Valid field types
+      const validFieldTypes = [
+        'text', 'number', 'dropdown', 'multi-select', 'checkbox',
+        'radio', 'textarea', 'date', 'email', 'phone', 'url', 'file'
+      ];
+
+      // Validate custom fields
+      for (const field of parsed) {
+        if (!field.fieldId || !field.label || !field.type) {
+          return res.status(400).json({
+            success: false,
+            message: 'Each custom field must have fieldId, label, and type',
+          });
+        }
+        if (!validFieldTypes.includes(field.type)) {
+          return res.status(400).json({
+            success: false,
+            message: `Field type "${field.type}" is not valid`,
+          });
+        }
+        if (['dropdown', 'radio', 'multi-select'].includes(field.type)) {
+          if (!field.options || field.options.length < 2) {
+            return res.status(400).json({
+              success: false,
+              message: `Field "${field.label}" requires at least 2 options`,
+            });
+          }
+        }
+      }
+
       event.customFormFields = parsed;
+    }
+
+    // Update default registration form fields
+    if (defaultFormFields !== undefined) {
+      const parsed = typeof defaultFormFields === 'string'
+        ? JSON.parse(defaultFormFields)
+        : defaultFormFields;
+      event.defaultFormFields = parsed || [];
+    }
+
+    // Update rules
+    if (rules !== undefined) {
+      const parsed = typeof rules === 'string' ? JSON.parse(rules) : rules;
+      event.rules = (parsed || []).filter(r => r && r.trim());
+    }
+
+    // Update FAQs
+    if (faqs !== undefined) {
+      const parsed = typeof faqs === 'string' ? JSON.parse(faqs) : faqs;
+      event.faqs = (parsed || []).filter(f => f && f.question && f.question.trim() && f.answer && f.answer.trim());
     }
 
     // Handle banner image update
@@ -404,6 +479,39 @@ export const cancelEvent = async (req, res) => {
   } catch (error) {
     console.error('Cancel event error:', error);
     res.status(500).json({ success: false, message: 'Failed to cancel event' });
+  }
+};
+
+/**
+ * DELETE /api/contributor/events/:id
+ * Permanently delete an event and all its registrations
+ */
+export const deleteEvent = async (req, res) => {
+  try {
+    const event = await Event.findOne({
+      _id: req.params.id,
+      createdBy: req.user._id,
+    });
+
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Event not found' });
+    }
+
+    // Delete banner from Cloudinary if exists
+    if (event.bannerImagePublicId) {
+      await deleteCloudinaryImage(event.bannerImagePublicId);
+    }
+
+    // Delete all registrations for this event
+    await Registration.deleteMany({ event: event._id });
+
+    // Delete the event
+    await event.deleteOne();
+
+    res.json({ success: true, message: 'Event deleted permanently' });
+  } catch (error) {
+    console.error('Delete event error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete event' });
   }
 };
 
@@ -591,9 +699,6 @@ export const getEventRegistrations = async (req, res) => {
       );
     }
 
-    // Count attendance
-    const attendedCount = registrations.filter(r => r.attended).length;
-
     // Paginate
     const startIndex = (parseInt(page) - 1) * parseInt(limit);
     const paginated = filtered.slice(startIndex, startIndex + parseInt(limit));
@@ -606,14 +711,14 @@ export const getEventRegistrations = async (req, res) => {
           title: event.title,
           totalSeats: event.totalSeats,
           registeredCount: event.registeredCount,
-          availableSeats: event.totalSeats != null ? event.totalSeats - event.registeredCount : null,
+          availableSeats: event.totalSeats != null && event.totalSeats > 0 ? event.totalSeats - event.registeredCount : null,
           customFormFields: event.customFormFields,
+          defaultFormFields: event.defaultFormFields,
         },
         registrations: paginated,
         stats: {
           totalRegistered: registrations.length,
-          seatsAvailable: event.totalSeats != null ? event.totalSeats - event.registeredCount : null,
-          attendedCount,
+          seatsAvailable: event.totalSeats != null && event.totalSeats > 0 ? event.totalSeats - event.registeredCount : null,
         },
         pagination: {
           total: filtered.length,
@@ -647,7 +752,6 @@ export const getAllRegistrations = async (req, res) => {
           .lean();
 
         const totalRegistered = await Registration.countDocuments({ event: event._id });
-        const attendedCount = await Registration.countDocuments({ event: event._id, attended: true });
 
         return {
           _id: event._id,
@@ -656,8 +760,7 @@ export const getAllRegistrations = async (req, res) => {
           eventDate: event.eventDate,
           totalSeats: event.totalSeats,
           registeredCount: event.registeredCount,
-          availableSeats: event.totalSeats - event.registeredCount,
-          attendedCount,
+          availableSeats: event.totalSeats != null && event.totalSeats > 0 ? event.totalSeats - event.registeredCount : null,
           status: event.status,
           previewStudents: registrations.map(r => ({
             _id: r._id,
@@ -665,7 +768,6 @@ export const getAllRegistrations = async (req, res) => {
             studentEmail: r.student?.email,
             collegeName: r.student?.collegeName,
             registeredAt: r.registeredAt,
-            attended: r.attended,
           })),
           totalRegistered,
         };
@@ -676,38 +778,6 @@ export const getAllRegistrations = async (req, res) => {
   } catch (error) {
     console.error('Get all registrations error:', error);
     res.status(500).json({ success: false, message: 'Failed to load registrations' });
-  }
-};
-
-/**
- * PUT /api/contributor/registrations/:id/attendance
- * Toggle attendance for a registration
- */
-export const toggleAttendance = async (req, res) => {
-  try {
-    const registration = await Registration.findById(req.params.id)
-      .populate('event', 'createdBy');
-
-    if (!registration) {
-      return res.status(404).json({ success: false, message: 'Registration not found' });
-    }
-
-    // Verify the event belongs to this contributor
-    if (registration.event.createdBy.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, message: 'Not authorized' });
-    }
-
-    registration.attended = !registration.attended;
-    await registration.save();
-
-    res.json({
-      success: true,
-      message: `Marked as ${registration.attended ? 'present' : 'absent'}`,
-      data: { attended: registration.attended },
-    });
-  } catch (error) {
-    console.error('Toggle attendance error:', error);
-    res.status(500).json({ success: false, message: 'Failed to update attendance' });
   }
 };
 
@@ -753,7 +823,6 @@ export const exportRegistrationsCSV = async (req, res) => {
       if (selectedFields.includes('college')) row['College'] = r.student?.college?.name || r.student?.collegeName || '';
       if (selectedFields.includes('phone')) row['Phone'] = r.student?.phone || '';
       if (selectedFields.includes('registeredAt')) row['Registered On'] = r.registeredAt ? new Date(r.registeredAt).toLocaleDateString() : '';
-      if (selectedFields.includes('attended')) row['Attended'] = r.attended ? 'Yes' : 'No';
 
       // Custom form fields
       if (r.formResponses) {
@@ -764,7 +833,20 @@ export const exportRegistrationsCSV = async (req, res) => {
         for (const field of (event.customFormFields || [])) {
           if (selectedFields.includes(field.fieldId)) {
             const value = responses[field.fieldId];
-            row[field.label] = Array.isArray(value) ? value.join(', ') : (value || '');
+            let displayValue = '';
+            
+            if (Array.isArray(value)) {
+              // Multi-select or array type
+              displayValue = value.join(', ');
+            } else if (value && typeof value === 'object') {
+              // File or object - just show [Uploaded]
+              displayValue = '[Uploaded]';
+            } else {
+              // Primitive value
+              displayValue = value || '';
+            }
+            
+            row[field.label] = displayValue;
           }
         }
       }

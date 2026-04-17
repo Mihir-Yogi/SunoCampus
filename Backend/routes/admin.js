@@ -8,6 +8,14 @@ import {
   changeUserRole,
   toggleUserStatus,
   deleteUser,
+  blockUser,
+  unblockUser,
+  blockPost,
+  unblockPost,
+  deletePost,
+  blockEvent,
+  unblockEvent,
+  deleteEvent,
   getContributorApplications,
   approveContributor,
   rejectContributor,
@@ -44,7 +52,17 @@ router.get('/users', getAllUsers);
 router.get('/users/:id', getUserById);
 router.put('/users/:id/role', changeUserRole);
 router.put('/users/:id/status', toggleUserStatus);
+router.put('/users/:id/block', blockUser);
+router.put('/users/:id/unblock', unblockUser);
 router.delete('/users/:id', deleteUser);
+
+// ===== Content Moderation =====
+router.put('/posts/:id/block', blockPost);
+router.put('/posts/:id/unblock', unblockPost);
+router.delete('/posts/:id', deletePost);
+router.put('/events/:id/block', blockEvent);
+router.put('/events/:id/unblock', unblockEvent);
+router.delete('/events/:id', deleteEvent);
 
 // ===== Contributor Verification =====
 router.get('/contributors', getContributorApplications);

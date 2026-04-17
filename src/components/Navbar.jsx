@@ -1,10 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { HiOutlineShieldCheck, HiOutlineUser, HiOutlineSquares2X2, HiOutlineRectangleStack } from 'react-icons/hi2';
+import { useSaveContext } from '../context/SaveContext';
+import { HiOutlineShieldCheck, HiOutlineUser, HiOutlineSquares2X2, HiOutlineRectangleStack, HiOutlineTicket, HiOutlineBookmark } from 'react-icons/hi2';
 
 export const Navbar = ({ isAuthenticated, userRole, onLogout }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { savedCount, fetchSavedCount } = useSaveContext();
+
+  // Fetch saved count when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchSavedCount();
+    }
+  }, [isAuthenticated, fetchSavedCount]);
 
   const handleLogout = () => {
     onLogout();
@@ -40,6 +49,21 @@ export const Navbar = ({ isAuthenticated, userRole, onLogout }) => {
                 <Link to="/browse" className="text-gray-700 hover:text-blue-600 font-medium transition-colors inline-flex items-center gap-1">
                   <HiOutlineRectangleStack size={18} /> Browse
                 </Link>
+                {userRole !== 'admin' && (
+                  <>
+                    <Link to="/my-registrations" className="text-gray-700 hover:text-blue-600 font-medium transition-colors inline-flex items-center gap-1">
+                      <HiOutlineTicket size={18} /> My Events
+                    </Link>
+                    <Link to="/saved-items" className="text-gray-700 hover:text-blue-600 font-medium transition-colors inline-flex items-center gap-1 relative">
+                      <HiOutlineBookmark size={18} /> Saved
+                      {savedCount > 0 && (
+                        <span className="absolute -top-2 -right-3 bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                          {savedCount > 99 ? '99+' : savedCount}
+                        </span>
+                      )}
+                    </Link>
+                  </>
+                )}
                 {userRole === 'admin' && (
                   <Link to="/admin" className="text-gray-700 hover:text-red-600 font-medium transition-colors inline-flex items-center gap-1">
                     <HiOutlineShieldCheck size={18} /> Admin
@@ -108,6 +132,21 @@ export const Navbar = ({ isAuthenticated, userRole, onLogout }) => {
                 <Link to="/browse" className="flex items-center gap-1.5 py-2 text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setMenuOpen(false)}>
                   <HiOutlineRectangleStack size={18} /> Browse
                 </Link>
+                {userRole !== 'admin' && (
+                  <>
+                    <Link to="/my-registrations" className="flex items-center gap-1.5 py-2 text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setMenuOpen(false)}>
+                      <HiOutlineTicket size={18} /> My Events
+                    </Link>
+                    <Link to="/saved-items" className="flex items-center gap-1.5 py-2 text-gray-700 hover:text-blue-600 transition-colors relative" onClick={() => setMenuOpen(false)}>
+                      <HiOutlineBookmark size={18} /> Saved Items
+                      {savedCount > 0 && (
+                        <span className="ml-auto bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                          {savedCount > 99 ? '99+' : savedCount}
+                        </span>
+                      )}
+                    </Link>
+                  </>
+                )}
                 {userRole === 'admin' && (
                   <Link to="/admin" className="flex items-center gap-1.5 py-2 text-gray-700 hover:text-red-600 transition-colors" onClick={() => setMenuOpen(false)}>
                     <HiOutlineShieldCheck size={18} /> Admin

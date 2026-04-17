@@ -1,5 +1,7 @@
 import Report from '../models/Report.js';
 import User from '../models/User.js';
+import Post from '../models/Post.js';
+import Event from '../models/Event.js';
 
 // ==================== USER-FACING ====================
 
@@ -234,6 +236,20 @@ export const resolveReport = async (req, res) => {
     // If action is to deactivate the user, do it
     if (actionTaken === 'user_deactivated' || actionTaken === 'user_banned') {
       await User.findByIdAndUpdate(report.reportedUser, { isActive: false });
+    }
+
+    // If action is to block the user
+    if (actionTaken === 'user_blocked') {
+      await User.findByIdAndUpdate(report.reportedUser, { isBlocked: true });
+    }
+
+    // If action is to block the reported content
+    if (actionTaken === 'content_blocked' && report.reportedContentId) {
+      if (report.reportType === 'post') {
+        await Post.findByIdAndUpdate(report.reportedContentId, { isBlocked: true });
+      } else if (report.reportType === 'event') {
+        await Event.findByIdAndUpdate(report.reportedContentId, { isBlocked: true });
+      }
     }
 
     res.json({ success: true, message: 'Report resolved', data: report });

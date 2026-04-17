@@ -31,7 +31,8 @@ api.interceptors.response.use(
       // let the component handle the 401 error and show the message.
       const url = error.config?.url || '';
       const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/google');
-      if (!isAuthEndpoint) {
+      const hadToken = !!localStorage.getItem('token');
+      if (!isAuthEndpoint && hadToken) {
         // Token expired or invalid — clear storage and redirect to login
         localStorage.removeItem('token');
         localStorage.removeItem('user');

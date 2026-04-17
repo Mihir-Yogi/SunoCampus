@@ -556,8 +556,8 @@ const PostCardMini = ({ post, onLike, onOpenPost, timeAgo, getInitials, index })
 // ─── Inline Event Card ───────────────────────────────────────
 const EventCardMini = ({ event, formatEventDate, getInitials, index }) => {
   const isPast = new Date(event.eventDate) < new Date();
-  const availableSeats = event.totalSeats != null ? event.totalSeats - event.registeredCount : null;
-  const seatsPercentage = event.totalSeats ? Math.min(100, Math.round((event.registeredCount / event.totalSeats) * 100)) : 0;
+  const availableSeats = event.totalSeats != null && event.totalSeats > 0 ? event.totalSeats - event.registeredCount : null;
+  const seatsPercentage = event.totalSeats && event.totalSeats > 0 ? Math.min(100, Math.round((event.registeredCount / event.totalSeats) * 100)) : 0;
 
   const getTimeDisplay = () => {
     if (isPast) return null;
@@ -632,7 +632,7 @@ const EventCardMini = ({ event, formatEventDate, getInitials, index }) => {
         </div>
 
         {/* Seats */}
-        {event.totalSeats && (
+        {event.totalSeats != null && event.totalSeats > 0 && (
           <div className="mb-3">
             <div className="flex items-center justify-between text-xs mb-1">
               <span className="text-gray-500 flex items-center gap-1">
